@@ -1,0 +1,83 @@
+# Performance Gates Configuration
+# Define thresholds and rules for benchmark quality gates
+
+gates:
+  - name: "Basic Performance"
+    description: "Minimum performance requirements"
+    checks:
+      - metric: "throughput"
+        operator: "gte"
+        value: 10000
+        required: true
+        description: "Minimum throughput"
+      
+      - metric: "error_rate"
+        operator: "lte"
+        value: 0.001
+        required: true
+        description: "Maximum error rate (0.1%)"
+      
+      - metric: "p99_latency_ms"
+        operator: "lte"
+        value: 50
+        required: false
+        description: "P99 latency target"
+
+  - name: "Latency SLO"
+    description: "Service level objectives for latency"
+    checks:
+      - metric: "avg_latency_ms"
+        operator: "lte"
+        value: 5
+        required: true
+        description: "Average latency < 5ms"
+      
+      - metric: "p50_latency_ms"
+        operator: "lte"
+        value: 2
+        required: true
+        description: "P50 latency < 2ms"
+      
+      - metric: "p95_latency_ms"
+        operator: "lte"
+        value: 20
+        required: true
+        description: "P95 latency < 20ms"
+      
+      - metric: "p99_latency_ms"
+        operator: "lte"
+        value: 50
+        required: true
+        description: "P99 latency < 50ms"
+
+  - name: "Baseline Regression"
+    description: "Compare against baseline"
+    baseline:
+      type: "previous"
+      max_deviation: 10
+    checks:
+      - metric: "throughput"
+        operator: "gte"
+        value: 0
+        required: true
+        description: "Throughput should not regress"
+
+# Alert configuration for performance regressions
+alerts:
+  slack:
+    enabled: false
+    webhook_url: "${SLACK_WEBHOOK_URL}"
+    channel: "#performance"
+    min_severity: "warning"
+  
+  pagerduty:
+    enabled: false
+    routing_key: "${PAGERDUTY_ROUTING_KEY}"
+    min_severity: "critical"
+
+# Reporting options
+reporting:
+  format: "markdown"
+  include_charts: true
+  include_comparison: true
+  artifact_retention_days: 30

@@ -1,0 +1,194 @@
+# RedisMeter GitHub Actions
+# This workflow runs Redis benchmarks and checks performance gates
+
+name: Redis Performance Benchmark
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      workload:
+        description: 'Workload to run'
+        required: false
+        default: 'mixed-workload'
+      duration:
+        description: 'Benchmark duration (e.g., 30s, 1m)'
+        required: false
+        default: '30s'
+      connections:
+        description: 'Number of connections'
+        required: false
+        default: '50'
+
+env:
+  GO_VERSION: '1.21'
+  REDIS_HOST: localhost
+  REDIS_PORT: 6379
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Build RedisMeter
+        run: |
+          go build -o redismeter ./cmd/redismeter
+
+      - name: Run Benchmark
+        id: benchmark
+        run: |
+          ./redismeter benchmark \
+            --host ${{ env.REDIS_HOST }} \
+            --port ${{ env.REDIS_PORT }} \
+            --workload ${{ inputs.workload || 'mixed-workload' }} \
+            --duration ${{ inputs.duration || '30s' }} \
+            --connections ${{ inputs.connections || '50' }} \
+            --output json \
+            --output-file results.json
+
+      - name: Check Performance Gates
+        id: gates
+        run: |
+          ./redismeter gate check \
+            --results results.json \
+            --gates .github/performance-gates.yaml \
+            --ci github \
+            --fail-on-breach
+
+      - name: Upload Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            results.json
+            *.html
+          retention-days: 30
+
+      - name: Post PR Comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const results = JSON.parse(fs.readFileSync('results.json', 'utf8'));
+            
+            let body = `## 📊 Benchmark Results\n\n`;
+            body += `| Metric | Value |\n|--------|-------|\n`;
+            
+            if (results.summary) {
+              body += `| Throughput | ${results.summary.ops_per_second.toFixed(2)} ops/sec |\n`;
+              body += `| Avg Latency | ${results.summary.avg_latency_ms.toFixed(2)} ms |\n`;
+              body += `| P99 Latency | ${results.summary.p99_latency_ms.toFixed(2)} ms |\n`;
+              body += `| Error Rate | ${(results.summary.error_rate * 100).toFixed(4)}% |\n`;
+            }
+            
+            body += `\n<details><summary>Full Results</summary>\n\n`;
+            body += `\`\`\`json\n${JSON.stringify(results, null, 2)}\n\`\`\`\n`;
+            body += `</details>`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+  compare-baseline:
+    needs: benchmark
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download Current Results
+        uses: actions/download-artifact@v4
+        with:
+          name: benchmark-results
+          path: current
+
+      - name: Get Baseline Results
+        id: baseline
+        continue-on-error: true
+        run: |
+          # Try to get baseline results from main branch
+          git checkout origin/main -- benchmark-baseline.json 2>/dev/null || echo "No baseline found"
+          if [ -f benchmark-baseline.json ]; then
+            echo "baseline_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "baseline_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Compare with Baseline
+        if: steps.baseline.outputs.baseline_exists == 'true'
+        run: |
+          ./redismeter compare \
+            --current current/results.json \
+            --baseline benchmark-baseline.json \
+            --output markdown \
+            --output-file comparison.md
+
+      - name: Post Comparison
+        if: steps.baseline.outputs.baseline_exists == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const comparison = fs.readFileSync('comparison.md', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comparison
+            });
+
+  update-baseline:
+    needs: benchmark
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Results
+        uses: actions/download-artifact@v4
+        with:
+          name: benchmark-results
+          path: .
+
+      - name: Update Baseline
+        run: |
+          cp results.json benchmark-baseline.json
+
+      - name: Commit Baseline
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: update benchmark baseline [skip ci]"
+          file_pattern: benchmark-baseline.json
