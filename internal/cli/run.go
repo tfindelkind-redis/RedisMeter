@@ -170,7 +170,7 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 	fmt.Println("📊 Results")
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	
+
 	if run.Results != nil && run.Results.Summary != nil {
 		s := run.Results.Summary
 		fmt.Printf("  Throughput:     %.2f ops/sec\n", s.OpsPerSecond)
@@ -178,7 +178,7 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  P50 Latency:    %.3f ms\n", s.P50LatencyMs)
 		fmt.Printf("  P99 Latency:    %.3f ms\n", s.P99LatencyMs)
 		fmt.Printf("  P99.9 Latency:  %.3f ms\n", s.P999LatencyMs)
-		
+
 		if len(run.Results.ByOperation) > 0 {
 			fmt.Println()
 			fmt.Println("  By Operation:")

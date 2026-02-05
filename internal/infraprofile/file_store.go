@@ -315,9 +315,9 @@ func (s *FileStore) GetStats(ctx context.Context) (*ProfileStats, error) {
 	}
 
 	var (
-		mostUsed       *Profile
+		mostUsed        *Profile
 		recentlyCreated *Profile
-		recentlyUsed   *Profile
+		recentlyUsed    *Profile
 	)
 
 	for _, p := range profiles {

@@ -128,7 +128,7 @@ func TestExecutor(t *testing.T) {
 
 func TestDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig()
-	
+
 	if cfg.Host != "localhost" {
 		t.Errorf("Host = %q, want %q", cfg.Host, "localhost")
 	}

@@ -21,11 +21,11 @@ const (
 
 // ProfileStats contains store statistics.
 type ProfileStats struct {
-	TotalProfiles   int               `json:"total_profiles"`
-	ByProvider      map[Provider]int  `json:"by_provider"`
-	MostUsed        *Profile          `json:"most_used,omitempty"`
-	RecentlyCreated *Profile          `json:"recently_created,omitempty"`
-	RecentlyUsed    *Profile          `json:"recently_used,omitempty"`
+	TotalProfiles   int              `json:"total_profiles"`
+	ByProvider      map[Provider]int `json:"by_provider"`
+	MostUsed        *Profile         `json:"most_used,omitempty"`
+	RecentlyCreated *Profile         `json:"recently_created,omitempty"`
+	RecentlyUsed    *Profile         `json:"recently_used,omitempty"`
 }
 
 // Profile represents a reusable infrastructure configuration.

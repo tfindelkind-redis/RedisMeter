@@ -48,19 +48,19 @@ func (e *LoggingExecutor) Run(ctx context.Context, config *Config, benchmarkID s
 
 	// Log command start
 	logger.Info("memtier:run", "Starting memtier_benchmark", map[string]interface{}{
-		"command":       cmdLine,
-		"host":          config.Host,
-		"port":          config.Port,
-		"threads":       config.Threads,
-		"clients":       config.Clients,
-		"duration":      config.Duration.String(),
-		"requests":      config.Requests,
-		"ratio":         config.Ratio,
-		"key_pattern":   config.KeyPattern,
-		"pipeline":      config.Pipeline,
-		"tls":           config.TLS,
-		"cluster":       config.Cluster,
-		"custom_cmds":   len(config.CustomCommands),
+		"command":     cmdLine,
+		"host":        config.Host,
+		"port":        config.Port,
+		"threads":     config.Threads,
+		"clients":     config.Clients,
+		"duration":    config.Duration.String(),
+		"requests":    config.Requests,
+		"ratio":       config.Ratio,
+		"key_pattern": config.KeyPattern,
+		"pipeline":    config.Pipeline,
+		"tls":         config.TLS,
+		"cluster":     config.Cluster,
+		"custom_cmds": len(config.CustomCommands),
 	})
 
 	// Log debug config details
@@ -73,11 +73,11 @@ func (e *LoggingExecutor) Run(ctx context.Context, config *Config, benchmarkID s
 	// Wrapper for progress that also logs
 	wrappedProgress := func(line string) {
 		// Only log significant lines (not every progress tick)
-		if strings.Contains(line, "Ops/sec") || 
-		   strings.Contains(line, "Error") ||
-		   strings.Contains(line, "error") ||
-		   strings.Contains(line, "CLUSTER") ||
-		   strings.Contains(line, "connected") {
+		if strings.Contains(line, "Ops/sec") ||
+			strings.Contains(line, "Error") ||
+			strings.Contains(line, "error") ||
+			strings.Contains(line, "CLUSTER") ||
+			strings.Contains(line, "connected") {
 			logger.Debug("memtier:output", line, nil)
 		}
 		if progressFn != nil {
@@ -168,7 +168,7 @@ func truncate(s string, maxLen int) string {
 // ConfigDiff compares two configs and returns the differences.
 func ConfigDiff(a, b *Config) map[string]interface{} {
 	diff := make(map[string]interface{})
-	
+
 	if a.Host != b.Host {
 		diff["host"] = []string{a.Host, b.Host}
 	}
@@ -202,7 +202,7 @@ func ConfigDiff(a, b *Config) map[string]interface{} {
 	if a.Cluster != b.Cluster {
 		diff["cluster"] = []bool{a.Cluster, b.Cluster}
 	}
-	
+
 	return diff
 }
 

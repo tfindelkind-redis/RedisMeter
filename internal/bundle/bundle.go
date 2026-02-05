@@ -68,20 +68,20 @@ type ContentsSummary struct {
 // ExportOptions configures what to include in the export.
 type ExportOptions struct {
 	// What to include
-	IncludeBenchmarks    bool     `json:"include_benchmarks"`
-	IncludeBaselines     bool     `json:"include_baselines"`
-	IncludeWorkloads     bool     `json:"include_workloads"`
-	IncludeRunProfiles   bool     `json:"include_run_profiles"`
-	IncludeInfraProfiles bool     `json:"include_infra_profiles"`
-	IncludeLogs          bool     `json:"include_logs"`
-	IncludeReports       bool     `json:"include_reports"`
+	IncludeBenchmarks    bool `json:"include_benchmarks"`
+	IncludeBaselines     bool `json:"include_baselines"`
+	IncludeWorkloads     bool `json:"include_workloads"`
+	IncludeRunProfiles   bool `json:"include_run_profiles"`
+	IncludeInfraProfiles bool `json:"include_infra_profiles"`
+	IncludeLogs          bool `json:"include_logs"`
+	IncludeReports       bool `json:"include_reports"`
 
 	// Filters
-	BenchmarkIDs   []string   `json:"benchmark_ids,omitempty"`
-	BaselineIDs    []string   `json:"baseline_ids,omitempty"`
-	WorkloadIDs    []string   `json:"workload_ids,omitempty"`
-	Since          *time.Time `json:"since,omitempty"`
-	Until          *time.Time `json:"until,omitempty"`
+	BenchmarkIDs []string   `json:"benchmark_ids,omitempty"`
+	BaselineIDs  []string   `json:"baseline_ids,omitempty"`
+	WorkloadIDs  []string   `json:"workload_ids,omitempty"`
+	Since        *time.Time `json:"since,omitempty"`
+	Until        *time.Time `json:"until,omitempty"`
 
 	// Metadata
 	Description string `json:"description,omitempty"`

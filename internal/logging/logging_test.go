@@ -123,7 +123,7 @@ func TestLoggerChaining(t *testing.T) {
 	chainedLogger.Info("test", "chained message", nil)
 
 	ctx := context.Background()
-	
+
 	// Should find by benchmark
 	entries, _ := store.Query(ctx, &QueryFilter{BenchmarkID: "bench-1"})
 	if len(entries) != 1 {
@@ -358,7 +358,7 @@ func TestLoggerWithContext(t *testing.T) {
 	defer store.Close()
 
 	logger := NewLogger(Config{Store: store, MinLevel: LevelDebug})
-	
+
 	// Log with context
 	ctx := map[string]interface{}{
 		"key1": "value1",

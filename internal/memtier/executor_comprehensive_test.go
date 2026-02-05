@@ -1322,18 +1322,18 @@ func TestBuild_DefaultConfig(t *testing.T) {
 func TestBuild_CloudBenchmarkConfig(t *testing.T) {
 	// Simulate cloud benchmark with TLS and cluster
 	cfg := &Config{
-		Host:      "redis-cluster.redis.cache.windows.net",
-		Port:      6380,
-		Password:  "access-key-here",
-		TLS:       true,
-		Cluster:   true,
-		Threads:   4,
-		Clients:   50,
-		Requests:  100000,
-		Ratio:     "4:1",
+		Host:       "redis-cluster.redis.cache.windows.net",
+		Port:       6380,
+		Password:   "access-key-here",
+		TLS:        true,
+		Cluster:    true,
+		Threads:    4,
+		Clients:    50,
+		Requests:   100000,
+		Ratio:      "4:1",
 		KeyPattern: "R",
-		Pipeline:  10,
-		DataSize:  256,
+		Pipeline:   10,
+		DataSize:   256,
 	}
 	args := NewCommandBuilder(cfg).Build()
 
@@ -1537,11 +1537,11 @@ func TestBuild_Connection_ForceIPv6(t *testing.T) {
 
 func TestBuild_TLS_WithCert(t *testing.T) {
 	cfg := &Config{
-		Host:    "localhost",
-		Port:    6379,
-		TLS:     true,
-		TLSCert: "/path/to/cert.pem",
-		Ratio:   "1:1",
+		Host:       "localhost",
+		Port:       6379,
+		TLS:        true,
+		TLSCert:    "/path/to/cert.pem",
+		Ratio:      "1:1",
 		KeyPattern: "R:R",
 	}
 	args := NewCommandBuilder(cfg).Build()
@@ -1555,11 +1555,11 @@ func TestBuild_TLS_WithCert(t *testing.T) {
 
 func TestBuild_TLS_WithKey(t *testing.T) {
 	cfg := &Config{
-		Host:    "localhost",
-		Port:    6379,
-		TLS:     true,
-		TLSKey:  "/path/to/key.pem",
-		Ratio:   "1:1",
+		Host:       "localhost",
+		Port:       6379,
+		TLS:        true,
+		TLSKey:     "/path/to/key.pem",
+		Ratio:      "1:1",
 		KeyPattern: "R:R",
 	}
 	args := NewCommandBuilder(cfg).Build()
@@ -1570,11 +1570,11 @@ func TestBuild_TLS_WithKey(t *testing.T) {
 
 func TestBuild_TLS_WithCACert(t *testing.T) {
 	cfg := &Config{
-		Host:      "localhost",
-		Port:      6379,
-		TLS:       true,
-		TLSCACert: "/path/to/ca.pem",
-		Ratio:     "1:1",
+		Host:       "localhost",
+		Port:       6379,
+		TLS:        true,
+		TLSCACert:  "/path/to/ca.pem",
+		Ratio:      "1:1",
 		KeyPattern: "R:R",
 	}
 	args := NewCommandBuilder(cfg).Build()
@@ -1758,10 +1758,10 @@ func TestBuild_DataImport_FullConfig(t *testing.T) {
 
 func TestBuild_Wait_Ratio(t *testing.T) {
 	cfg := &Config{
-		Host:      "localhost",
-		Port:      6379,
-		WaitRatio: "1:1",
-		Ratio:     "1:1",
+		Host:       "localhost",
+		Port:       6379,
+		WaitRatio:  "1:1",
+		Ratio:      "1:1",
 		KeyPattern: "R:R",
 	}
 	args := NewCommandBuilder(cfg).Build()
@@ -1886,10 +1886,10 @@ func TestBuild_Protocol_RESP3_New(t *testing.T) {
 
 func TestBuild_Requests_Count(t *testing.T) {
 	cfg := &Config{
-		Host:     "localhost",
-		Port:     6379,
-		Requests: 10000,
-		Ratio:    "1:1",
+		Host:       "localhost",
+		Port:       6379,
+		Requests:   10000,
+		Ratio:      "1:1",
 		KeyPattern: "R:R",
 	}
 	args := NewCommandBuilder(cfg).Build()

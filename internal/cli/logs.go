@@ -112,7 +112,7 @@ func getLogStore() (*logging.SQLiteStore, error) {
 	}
 
 	dbPath := filepath.Join(homeDir, ".redismeter", "logs.db")
-	
+
 	// Ensure directory exists
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
 		return nil, fmt.Errorf("failed to create log directory: %w", err)

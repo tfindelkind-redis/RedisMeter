@@ -73,12 +73,12 @@ var profilesStatsCmd = &cobra.Command{
 
 // Flags
 var (
-	profilesProvider  string
-	profilesTag       string
-	profilesFile      string
-	profilesForce     bool
-	profilesFormat    string
-	profilesVerbose   bool
+	profilesProvider string
+	profilesTag      string
+	profilesFile     string
+	profilesForce    bool
+	profilesFormat   string
+	profilesVerbose  bool
 )
 
 func init() {
@@ -114,7 +114,7 @@ func getProfileStore() (*infraprofile.FileStore, error) {
 	}
 
 	storePath := filepath.Join(homeDir, ".redismeter", "infra-profiles")
-	
+
 	// Ensure directory exists
 	if err := os.MkdirAll(storePath, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create profile directory: %w", err)
@@ -151,7 +151,7 @@ func runProfilesList(cmd *cobra.Command, args []string) error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	
+
 	if profilesVerbose {
 		fmt.Fprintln(w, "ID\tNAME\tPROVIDER\tTAGS\tUSED\tCREATED")
 		fmt.Fprintln(w, strings.Repeat("-", 80))
@@ -185,7 +185,7 @@ func runProfilesList(cmd *cobra.Command, args []string) error {
 			)
 		}
 	}
-	
+
 	w.Flush()
 	fmt.Printf("\nTotal: %d profiles\n", len(profiles))
 
@@ -357,7 +357,7 @@ func runProfilesExport(cmd *cobra.Command, args []string) error {
 	defer store.Close()
 
 	ctx := context.Background()
-	
+
 	var profiles []*infraprofile.Profile
 	if profilesProvider != "" {
 		profiles, err = store.ListByProvider(ctx, infraprofile.Provider(profilesProvider))

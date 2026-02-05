@@ -25,16 +25,16 @@ const (
 type Source string
 
 const (
-	SourceMemtier    Source = "memtier"
-	SourceTerraform  Source = "terraform"
-	SourceAPI        Source = "api"
-	SourceStorage    Source = "storage"
-	SourceAnalysis   Source = "analysis"
-	SourceEngine     Source = "engine"
-	SourceInfra      Source = "infrastructure"
-	SourceExport     Source = "export"
-	SourceImport     Source = "import"
-	SourceInternal   Source = "internal"
+	SourceMemtier   Source = "memtier"
+	SourceTerraform Source = "terraform"
+	SourceAPI       Source = "api"
+	SourceStorage   Source = "storage"
+	SourceAnalysis  Source = "analysis"
+	SourceEngine    Source = "engine"
+	SourceInfra     Source = "infrastructure"
+	SourceExport    Source = "export"
+	SourceImport    Source = "import"
+	SourceInternal  Source = "internal"
 )
 
 // Entry represents a single log entry.

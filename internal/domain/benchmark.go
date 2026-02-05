@@ -90,7 +90,7 @@ type RunProfile struct {
 type Workload struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
-	Type        string `json:"type"`       // e.g., "cache", "session", "custom"
+	Type        string `json:"type"` // e.g., "cache", "session", "custom"
 	IsBuiltin   bool   `json:"is_builtin,omitempty"`
 
 	// Operations - what commands to run
@@ -100,9 +100,9 @@ type Workload struct {
 	KeyPattern *KeyPattern `json:"key_pattern,omitempty"`
 
 	// Data configuration
-	DataSize    *DataSize `json:"data_size,omitempty"`
-	RandomData  bool      `json:"random_data,omitempty"`  // Randomize value content
-	DataOffset  int       `json:"data_offset,omitempty"`  // Use SETRANGE/GETRANGE with offset
+	DataSize   *DataSize `json:"data_size,omitempty"`
+	RandomData bool      `json:"random_data,omitempty"` // Randomize value content
+	DataOffset int       `json:"data_offset,omitempty"` // Use SETRANGE/GETRANGE with offset
 
 	// Expiry
 	ExpiryMin int `json:"expiry_min,omitempty"` // Min expiry in seconds

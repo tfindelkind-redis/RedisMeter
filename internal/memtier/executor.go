@@ -41,8 +41,8 @@ type Config struct {
 	Cluster   bool // Redis cluster mode
 
 	// Workload settings (WHAT to test)
-	Ratio        string  // e.g., "1:1" for 50% GET, 50% SET
-	KeyPattern   string  // R=random, S=sequential, G=gaussian, Z=zipf, P=parallel
+	Ratio        string // e.g., "1:1" for 50% GET, 50% SET
+	KeyPattern   string // R=random, S=sequential, G=gaussian, Z=zipf, P=parallel
 	KeyMinimum   int64
 	KeyMaximum   int64
 	KeyPrefix    string
@@ -95,15 +95,15 @@ type Config struct {
 
 	// Output options
 	JSONOutput       bool
-	JSONOutFile      string   // JSON output file path
-	OutFile          string   // Output file path
-	HdrFilePrefix    string   // HDR histogram file prefix
-	ClientStats      string   // Per-client stats file
+	JSONOutFile      string // JSON output file path
+	OutFile          string // Output file path
+	HdrFilePrefix    string // HDR histogram file prefix
+	ClientStats      string // Per-client stats file
 	HideHistogram    bool
 	PrintPercentiles []float64
-	PrintAllRuns     bool   // Print results for all iterations
-	ShowConfig       bool   // Print detailed config before running
-	Debug            bool   // Print debug output
+	PrintAllRuns     bool // Print results for all iterations
+	ShowConfig       bool // Print detailed config before running
+	Debug            bool // Print debug output
 }
 
 // CustomCommand for arbitrary memtier commands.
@@ -369,7 +369,7 @@ func (b *CommandBuilder) Build() []string {
 	// Workload - Key settings (only if NOT using custom commands)
 	if !hasCustomCommands {
 		args = append(args, "--ratio", b.config.Ratio)
-		
+
 		// Ensure key-pattern is in correct format (X:X)
 		keyPattern := b.config.KeyPattern
 		if keyPattern != "" && !strings.Contains(keyPattern, ":") {
@@ -377,7 +377,7 @@ func (b *CommandBuilder) Build() []string {
 		}
 		args = append(args, "--key-pattern", keyPattern)
 	}
-	
+
 	// Key range (always needed) - ensure key-minimum > 0
 	keyMin := b.config.KeyMinimum
 	if keyMin <= 0 {
@@ -612,11 +612,11 @@ func (e *Executor) GetVersion() (string, error) {
 
 // ExecutionResult holds the output from a memtier run.
 type ExecutionResult struct {
-	RawJSON    []byte
-	RawText    string
-	ExitCode   int
-	Duration   time.Duration
-	Error      error
+	RawJSON  []byte
+	RawText  string
+	ExitCode int
+	Duration time.Duration
+	Error    error
 }
 
 // Run executes memtier_benchmark with the given configuration.

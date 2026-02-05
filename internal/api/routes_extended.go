@@ -134,7 +134,7 @@ func (s *Server) handleLogExport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	filename := "redismeter-logs-" + time.Now().Format("2006-01-02") + "." + format
-	
+
 	switch format {
 	case "json":
 		w.Header().Set("Content-Type", "application/json")
@@ -145,7 +145,7 @@ func (s *Server) handleLogExport(w http.ResponseWriter, r *http.Request) {
 	default:
 		w.Header().Set("Content-Type", "application/octet-stream")
 	}
-	
+
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+filename+"\"")
 	w.Write(data)
 }
@@ -545,9 +545,9 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 
 	// Check content type
 	contentType := r.Header.Get("Content-Type")
-	if !strings.HasPrefix(contentType, "application/zip") && 
-	   !strings.HasPrefix(contentType, "application/octet-stream") &&
-	   !strings.HasPrefix(contentType, "multipart/form-data") {
+	if !strings.HasPrefix(contentType, "application/zip") &&
+		!strings.HasPrefix(contentType, "application/octet-stream") &&
+		!strings.HasPrefix(contentType, "multipart/form-data") {
 		writeError(w, http.StatusBadRequest, "Expected application/zip or multipart/form-data content type")
 		return
 	}

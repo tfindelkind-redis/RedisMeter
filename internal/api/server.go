@@ -43,10 +43,10 @@ type Server struct {
 	webDir string // Directory containing built frontend
 
 	// Extended features (set via Register* methods)
-	logStore          LogStore          // Log storage
-	infraProfileStore InfraProfileStore // Infrastructure profile storage
+	logStore          LogStore           // Log storage
+	infraProfileStore InfraProfileStore  // Infrastructure profile storage
 	bundleProvider    BundleDataProvider // Export/import data provider
-	bundleVersion     string            // Application version for bundle manifest
+	bundleVersion     string             // Application version for bundle manifest
 }
 
 // ActiveInfraOp tracks an active infrastructure operation.
@@ -463,49 +463,49 @@ func (s *Server) listWorkloads(w http.ResponseWriter, r *http.Request) {
 	builtinWorkloads := []map[string]interface{}{
 		{"name": "cache", "description": "Standard cache workload with GET/SET operations", "is_builtin": true,
 			"operations": []map[string]interface{}{{"command": "GET", "ratio": 0.8}, {"command": "SET", "ratio": 0.2}},
-			"threads": 4, "clients": 50, "duration": "30s", "pipeline": 1,
+			"threads":    4, "clients": 50, "duration": "30s", "pipeline": 1,
 			"key_pattern": map[string]interface{}{"prefix": "cache:", "pattern": "random", "key_range": 1000000},
-			"data_size": map[string]interface{}{"fixed": 256}},
+			"data_size":   map[string]interface{}{"fixed": 256}},
 		{"name": "mixed", "description": "Mixed workload with various operation types", "is_builtin": true,
 			"operations": []map[string]interface{}{{"command": "GET", "ratio": 0.5}, {"command": "SET", "ratio": 0.5}},
-			"threads": 4, "clients": 50, "duration": "30s", "pipeline": 1,
+			"threads":    4, "clients": 50, "duration": "30s", "pipeline": 1,
 			"key_pattern": map[string]interface{}{"prefix": "mixed:", "pattern": "random", "key_range": 500000},
-			"data_size": map[string]interface{}{"min": 64, "max": 1024}},
+			"data_size":   map[string]interface{}{"min": 64, "max": 1024}},
 		{"name": "read-heavy", "description": "Read-heavy workload (90% GET, 10% SET)", "is_builtin": true,
 			"operations": []map[string]interface{}{{"command": "GET", "ratio": 0.9}, {"command": "SET", "ratio": 0.1}},
-			"threads": 4, "clients": 50, "duration": "30s", "pipeline": 1,
+			"threads":    4, "clients": 50, "duration": "30s", "pipeline": 1,
 			"key_pattern": map[string]interface{}{"prefix": "read:", "pattern": "random", "key_range": 1000000},
-			"data_size": map[string]interface{}{"fixed": 256}},
+			"data_size":   map[string]interface{}{"fixed": 256}},
 		{"name": "write-heavy", "description": "Write-heavy workload (10% GET, 90% SET)", "is_builtin": true,
 			"operations": []map[string]interface{}{{"command": "GET", "ratio": 0.1}, {"command": "SET", "ratio": 0.9}},
-			"threads": 4, "clients": 50, "duration": "30s", "pipeline": 1,
+			"threads":    4, "clients": 50, "duration": "30s", "pipeline": 1,
 			"key_pattern": map[string]interface{}{"prefix": "write:", "pattern": "random", "key_range": 1000000},
-			"data_size": map[string]interface{}{"fixed": 256}},
+			"data_size":   map[string]interface{}{"fixed": 256}},
 		{"name": "pipeline", "description": "Pipeline workload for bulk operations", "is_builtin": true,
 			"operations": []map[string]interface{}{{"command": "GET", "ratio": 0.8}, {"command": "SET", "ratio": 0.2}},
-			"threads": 4, "clients": 100, "duration": "30s", "pipeline": 10,
+			"threads":    4, "clients": 100, "duration": "30s", "pipeline": 10,
 			"key_pattern": map[string]interface{}{"prefix": "pipe:", "pattern": "random", "key_range": 1000000},
-			"data_size": map[string]interface{}{"fixed": 100}},
+			"data_size":   map[string]interface{}{"fixed": 100}},
 		{"name": "large-values", "description": "Large value workload (1KB-10KB)", "is_builtin": true,
 			"operations": []map[string]interface{}{{"command": "GET", "ratio": 0.5}, {"command": "SET", "ratio": 0.5}},
-			"threads": 4, "clients": 20, "duration": "30s", "pipeline": 1,
+			"threads":    4, "clients": 20, "duration": "30s", "pipeline": 1,
 			"key_pattern": map[string]interface{}{"prefix": "large:", "pattern": "random", "key_range": 10000},
-			"data_size": map[string]interface{}{"min": 1024, "max": 10240}},
+			"data_size":   map[string]interface{}{"min": 1024, "max": 10240}},
 		{"name": "small-values", "description": "Small value workload (8-64 bytes)", "is_builtin": true,
 			"operations": []map[string]interface{}{{"command": "GET", "ratio": 0.8}, {"command": "SET", "ratio": 0.2}},
-			"threads": 4, "clients": 50, "duration": "30s", "pipeline": 1,
+			"threads":    4, "clients": 50, "duration": "30s", "pipeline": 1,
 			"key_pattern": map[string]interface{}{"prefix": "small:", "pattern": "random", "key_range": 1000000},
-			"data_size": map[string]interface{}{"min": 8, "max": 64}},
+			"data_size":   map[string]interface{}{"min": 8, "max": 64}},
 		{"name": "scan-heavy", "description": "SCAN operation heavy workload", "is_builtin": true,
 			"operations": []map[string]interface{}{{"command": "SCAN", "ratio": 0.7}, {"command": "GET", "ratio": 0.3}},
-			"threads": 2, "clients": 10, "duration": "30s", "pipeline": 1,
+			"threads":    2, "clients": 10, "duration": "30s", "pipeline": 1,
 			"key_pattern": map[string]interface{}{"prefix": "scan:", "pattern": "random", "key_range": 100000},
-			"data_size": map[string]interface{}{"fixed": 256}},
+			"data_size":   map[string]interface{}{"fixed": 256}},
 		{"name": "huge-read", "description": "100% GET workload with 100KB values", "is_builtin": true,
 			"operations": []map[string]interface{}{{"command": "GET", "ratio": 1.0}},
-			"threads": 4, "clients": 20, "duration": "30s", "pipeline": 1,
+			"threads":    4, "clients": 20, "duration": "30s", "pipeline": 1,
 			"key_pattern": map[string]interface{}{"prefix": "huge:", "pattern": "random", "key_range": 10000},
-			"data_size": map[string]interface{}{"fixed": 102400}},
+			"data_size":   map[string]interface{}{"fixed": 102400}},
 	}
 
 	// Get custom workloads from storage
@@ -947,10 +947,10 @@ func (s *Server) deleteRunProfile(w http.ResponseWriter, r *http.Request, name s
 
 // BenchmarkConfig represents a benchmark configuration.
 type BenchmarkConfig struct {
-	Workload   string   `json:"workload"`
-	RunProfile string   `json:"run_profile,omitempty"` // Optional run profile name
-	Target     string   `json:"target"`
-	Password   string   `json:"password,omitempty"`
+	Workload   string `json:"workload"`
+	RunProfile string `json:"run_profile,omitempty"` // Optional run profile name
+	Target     string `json:"target"`
+	Password   string `json:"password,omitempty"`
 	// Legacy fields - kept for backwards compatibility, overridden by run profile if specified
 	Duration string   `json:"duration,omitempty"`
 	Requests int      `json:"requests,omitempty"`

@@ -331,7 +331,7 @@ func TestBundleWithFiles(t *testing.T) {
 
 	// Read and verify files
 	reader, _ := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
-	
+
 	foundFile := false
 	for _, f := range reader.File {
 		if f.Name == "files/reports/test.html" {
