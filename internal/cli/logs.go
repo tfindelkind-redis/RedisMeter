@@ -105,20 +105,15 @@ func init() {
 	logsClearCmd.Flags().BoolVarP(&logsForce, "force", "f", false, "Skip confirmation")
 }
 
-func getLogStore() (*logging.SQLiteStore, error) {
+func getLogStore() (*logging.JSONStore, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get home directory: %w", err)
 	}
 
-	dbPath := filepath.Join(homeDir, ".redismeter", "logs.db")
+	logDir := filepath.Join(homeDir, ".redismeter", "logs")
 
-	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
-		return nil, fmt.Errorf("failed to create log directory: %w", err)
-	}
-
-	return logging.NewSQLiteStore(dbPath)
+	return logging.NewJSONStore(logDir)
 }
 
 func runLogsList(cmd *cobra.Command, args []string) error {

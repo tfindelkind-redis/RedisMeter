@@ -91,8 +91,8 @@ func runServe(cmd *cobra.Command, args []string) error {
 	homeDir, _ := os.UserHomeDir()
 	basePath := filepath.Join(homeDir, ".redismeter")
 
-	// Initialize log store
-	logStore, err := logging.NewSQLiteStore(filepath.Join(basePath, "logs.db"))
+	// Initialize log store (JSON-based)
+	logStore, err := logging.NewJSONStore(filepath.Join(basePath, "logs"))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: Log storage not available: %v\n", err)
 	} else {
@@ -201,9 +201,9 @@ func runServe(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// apiLogStoreAdapter adapts logging.SQLiteStore to the api.LogStore interface
+// apiLogStoreAdapter adapts logging.JSONStore to the api.LogStore interface
 type apiLogStoreAdapter struct {
-	store *logging.SQLiteStore
+	store *logging.JSONStore
 }
 
 func (a *apiLogStoreAdapter) Query(filter logging.QueryFilter) ([]*logging.Entry, error) {

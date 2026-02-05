@@ -111,7 +111,7 @@ func init() {
 // cliDataProvider implements bundle.DataProvider using CLI stores
 type cliDataProvider struct {
 	store        *storage.FileStorage
-	logStore     *logging.SQLiteStore
+	logStore     *logging.JSONStore
 	profileStore *infraprofile.FileStore
 }
 
@@ -129,7 +129,7 @@ func newCLIDataProvider() (*cliDataProvider, error) {
 	}
 
 	// Create log store
-	logStore, err := logging.NewSQLiteStore(filepath.Join(basePath, "logs.db"))
+	logStore, err := logging.NewJSONStore(filepath.Join(basePath, "logs"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create log store: %w", err)
 	}
@@ -335,7 +335,7 @@ func (p *cliDataProvider) GetReportFiles(ctx context.Context, benchmarkIDs []str
 // cliDataImporter implements bundle.DataImporter
 type cliDataImporter struct {
 	store        *storage.FileStorage
-	logStore     *logging.SQLiteStore
+	logStore     *logging.JSONStore
 	profileStore *infraprofile.FileStore
 }
 
