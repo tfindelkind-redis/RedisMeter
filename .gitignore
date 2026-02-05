@@ -38,3 +38,6 @@ dist/
 tmp/
 *.tmp
 *.log
+
+#node
+web/node_modules/

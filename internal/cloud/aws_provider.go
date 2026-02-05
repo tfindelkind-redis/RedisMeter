@@ -615,13 +615,10 @@ func (p *AWSProvider) ensureSecurityGroup(ctx context.Context, client *ec2.Clien
 
 // provisionInstances launches EC2 instances.
 func (p *AWSProvider) provisionInstances(ctx context.Context, client *ec2.Client, spec *InfraSpec, nodeSpec *NodeGroupSpec, role string, tags map[string]string) ([]Instance, error) {
-	// Determine AMI
-	ami := nodeSpec.Image
+	// Determine AMI - Ubuntu is enforced, only use custom if explicitly configured in provider
+	ami := p.config.DefaultAMI
 	if ami == "" {
-		ami = p.config.DefaultAMI
-	}
-	if ami == "" {
-		// Find latest Ubuntu AMI
+		// Find latest Ubuntu AMI (enforced OS)
 		var err error
 		ami, err = p.findLatestUbuntuAMI(ctx, client)
 		if err != nil {

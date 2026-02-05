@@ -1,0 +1,283 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --redis-red: #DC382D;
+  --bg-dark: #f5f5f5;
+  --bg-card: #ffffff;
+  --text-primary: rgba(0, 0, 0, 0.85);
+  --text-secondary: rgba(0, 0, 0, 0.65);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f0f0f0;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c0c0c0;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a0a0a0;
+}
+
+/* Ant Design Menu light theme overrides - force light colors */
+.ant-menu.ant-menu-light,
+.ant-menu-light.ant-menu-root,
+.ant-menu.ant-menu-inline {
+  background: #fafafa !important;
+  color: rgba(0, 0, 0, 0.85) !important;
+}
+
+.ant-menu-light .ant-menu-item,
+.ant-menu-light.ant-menu-inline .ant-menu-item,
+.ant-menu.ant-menu-light .ant-menu-item {
+  color: rgba(0, 0, 0, 0.85) !important;
+}
+
+.ant-menu-light .ant-menu-item:hover,
+.ant-menu-light.ant-menu-inline .ant-menu-item:hover {
+  color: #DC382D !important;
+  background-color: rgba(220, 56, 45, 0.08) !important;
+}
+
+.ant-menu-light .ant-menu-item-selected,
+.ant-menu-light.ant-menu-inline .ant-menu-item-selected {
+  color: #DC382D !important;
+  background-color: rgba(220, 56, 45, 0.12) !important;
+}
+
+.ant-menu-light .ant-menu-item .anticon,
+.ant-menu.ant-menu-light .ant-menu-item .anticon {
+  color: rgba(0, 0, 0, 0.65) !important;
+}
+
+.ant-menu-light .ant-menu-item-selected .anticon {
+  color: #DC382D !important;
+}
+
+/* Force sidebar text to be visible */
+.ant-layout-sider {
+  background: #ffffff !important;
+}
+
+.ant-layout-sider .ant-menu {
+  background: #fafafa !important;
+}
+
+.ant-layout-sider .ant-menu-title-content {
+  color: rgba(0, 0, 0, 0.85) !important;
+}
+
+/* Dashboard grid layout */
+.dashboard-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+/* Stat card styling */
+.stat-card {
+  background: var(--bg-card);
+  border-radius: 8px;
+  padding: 20px;
+  border: 1px solid #e8e8e8;
+}
+
+.stat-card:hover {
+  border-color: var(--redis-red);
+  transition: border-color 0.3s ease;
+}
+
+/* Chart container */
+.chart-container {
+  background: var(--bg-card);
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #e8e8e8;
+}
+
+/* Metric value styling */
+.metric-value {
+  font-size: 32px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.metric-value.positive {
+  color: #52c41a;
+}
+
+.metric-value.negative {
+  color: #ff4d4f;
+}
+
+.metric-label {
+  font-size: 14px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Sparkline container */
+.sparkline-container {
+  height: 40px;
+  margin-top: 8px;
+}
+
+/* Status indicators */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 8px;
+}
+
+.status-dot.running {
+  background-color: #1890ff;
+  animation: pulse 1.5s infinite;
+}
+
+.status-dot.completed {
+  background-color: #52c41a;
+}
+
+.status-dot.failed {
+  background-color: #ff4d4f;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Ant Design overrides for light theme */
+.ant-layout {
+  background: var(--bg-dark) !important;
+}
+
+.ant-layout-sider {
+  background: #fafafa !important;
+}
+
+/* Force all cards to white background with light border */
+.ant-card {
+  background: #ffffff !important;
+  border-color: #e8e8e8 !important;
+}
+
+.ant-card-head {
+  background: #ffffff !important;
+  border-bottom-color: #e8e8e8 !important;
+}
+
+.ant-card-head-title {
+  color: rgba(0, 0, 0, 0.85) !important;
+}
+
+.ant-table {
+  background: #ffffff !important;
+}
+
+.ant-table-thead > tr > th {
+  background: #fafafa !important;
+  color: rgba(0, 0, 0, 0.85) !important;
+  border-bottom-color: #e8e8e8 !important;
+}
+
+.ant-table-tbody > tr > td {
+  border-bottom-color: #e8e8e8 !important;
+}
+
+.ant-table-tbody > tr:hover > td {
+  background: #fafafa !important;
+}
+
+.ant-statistic-content-value {
+  color: var(--text-primary) !important;
+}
+
+.ant-statistic-title {
+  color: rgba(0, 0, 0, 0.65) !important;
+}
+
+/* Typography overrides - force dark text */
+h1, h2, h3, h4, h5, h6,
+.ant-typography,
+.ant-typography h1,
+.ant-typography h2,
+.ant-typography h3,
+.ant-typography h4 {
+  color: rgba(0, 0, 0, 0.85) !important;
+}
+
+/* Form controls */
+.ant-input,
+.ant-select-selector,
+.ant-picker {
+  background: #ffffff !important;
+  border-color: #d9d9d9 !important;
+}
+
+.ant-select-dropdown {
+  background: #ffffff !important;
+}
+
+.ant-select-item {
+  color: rgba(0, 0, 0, 0.85) !important;
+}
+
+.ant-select-item-option-selected {
+  background: rgba(220, 56, 45, 0.1) !important;
+}
+
+/* Descriptions */
+.ant-descriptions-item-label {
+  color: rgba(0, 0, 0, 0.65) !important;
+}
+
+.ant-descriptions-item-content {
+  color: rgba(0, 0, 0, 0.85) !important;
+}
+
+/* Recharts customization */
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: #e8e8e8;
+}
+
+.recharts-text {
+  fill: rgba(0, 0, 0, 0.65);
+}
+
+.recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: #ffffff !important;
+  border-color: #e8e8e8 !important;
+}
+
+/* Tags */
+.ant-tag {
+  background: #fafafa;
+  border-color: #d9d9d9;
+}

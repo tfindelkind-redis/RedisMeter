@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -62,12 +63,14 @@ func init() {
 	serveCmd.Flags().Bool("cors", false, "Enable CORS")
 	serveCmd.Flags().StringSlice("origins", []string{"*"}, "Allowed CORS origins")
 	serveCmd.Flags().String("api-key", "", "API key for authentication")
+	serveCmd.Flags().String("web-dir", "", "Directory containing built frontend (enables production mode)")
 
 	viper.BindPFlag("server.addr", serveCmd.Flags().Lookup("addr"))
 	viper.BindPFlag("server.port", serveCmd.Flags().Lookup("port"))
 	viper.BindPFlag("server.cors", serveCmd.Flags().Lookup("cors"))
 	viper.BindPFlag("server.origins", serveCmd.Flags().Lookup("origins"))
 	viper.BindPFlag("server.api_key", serveCmd.Flags().Lookup("api-key"))
+	viper.BindPFlag("server.web_dir", serveCmd.Flags().Lookup("web-dir"))
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
@@ -94,6 +97,25 @@ func runServe(cmd *cobra.Command, args []string) error {
 		EnableCORS:     viper.GetBool("server.cors"),
 		AllowedOrigins: viper.GetStringSlice("server.origins"),
 		APIKey:         viper.GetString("server.api_key"),
+		WebDir:         viper.GetString("server.web_dir"),
+	}
+
+	// Auto-detect web directory if not specified
+	if cfg.WebDir == "" {
+		// Check common locations
+		exePath, _ := os.Executable()
+		exeDir := filepath.Dir(exePath)
+		possiblePaths := []string{
+			filepath.Join(exeDir, "web", "dist"),
+			filepath.Join(exeDir, "..", "web", "dist"),
+			"web/dist",
+		}
+		for _, p := range possiblePaths {
+			if _, err := os.Stat(filepath.Join(p, "index.html")); err == nil {
+				cfg.WebDir = p
+				break
+			}
+		}
 	}
 
 	// Create and start server
@@ -107,6 +129,9 @@ func runServe(cmd *cobra.Command, args []string) error {
 		fmt.Printf("🚀 RedisMeter API server starting on %s\n", addr)
 		fmt.Println()
 		fmt.Println("Endpoints:")
+		if cfg.WebDir != "" {
+			fmt.Printf("  Web UI:     http://localhost%s/\n", addr)
+		}
 		fmt.Printf("  Health:     http://localhost%s/health\n", addr)
 		fmt.Printf("  API:        http://localhost%s/api/v1/\n", addr)
 		fmt.Printf("  WebSocket:  ws://localhost%s/api/v1/ws\n", addr)

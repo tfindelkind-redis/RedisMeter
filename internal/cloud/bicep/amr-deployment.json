@@ -1,0 +1,798 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "languageVersion": "2.0",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.39.26.7824",
+      "templateHash": "2013340169826492117"
+    }
+  },
+  "parameters": {
+    "redisName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the Redis Enterprise cluster"
+      }
+    },
+    "location": {
+      "type": "string",
+      "metadata": {
+        "description": "Azure region for the resource"
+      }
+    },
+    "skuName": {
+      "type": "string",
+      "defaultValue": "Balanced_B5",
+      "metadata": {
+        "description": "SKU name for AMR"
+      }
+    },
+    "clusteringPolicy": {
+      "type": "string",
+      "defaultValue": "OSSCluster",
+      "allowedValues": [
+        "EnterpriseCluster",
+        "OSSCluster"
+      ],
+      "metadata": {
+        "description": "Clustering policy"
+      }
+    },
+    "highAvailability": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Enable high availability"
+      }
+    },
+    "evictionPolicy": {
+      "type": "string",
+      "defaultValue": "VolatileLRU",
+      "allowedValues": [
+        "NoEviction",
+        "AllKeysLRU",
+        "AllKeysRandom",
+        "VolatileLRU",
+        "VolatileRandom",
+        "VolatileTTL",
+        "AllKeysLFU",
+        "VolatileLFU"
+      ],
+      "metadata": {
+        "description": "Eviction policy"
+      }
+    },
+    "rdbEnabled": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Enable RDB persistence"
+      }
+    },
+    "rdbFrequency": {
+      "type": "string",
+      "defaultValue": "1h",
+      "allowedValues": [
+        "1h",
+        "6h",
+        "12h"
+      ],
+      "metadata": {
+        "description": "RDB frequency"
+      }
+    },
+    "aofEnabled": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Enable AOF persistence"
+      }
+    },
+    "aofFrequency": {
+      "type": "string",
+      "defaultValue": "1s",
+      "allowedValues": [
+        "1s",
+        "always"
+      ],
+      "metadata": {
+        "description": "AOF frequency"
+      }
+    },
+    "enableRediSearch": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Enable RediSearch module"
+      }
+    },
+    "enableRedisJSON": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Enable RedisJSON module"
+      }
+    },
+    "enableRedisTimeSeries": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Enable RedisTimeSeries module"
+      }
+    },
+    "enableRedisBloom": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Enable RedisBloom module"
+      }
+    },
+    "enablePrivateEndpoint": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Enable private endpoint"
+      }
+    },
+    "vnetId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "VNet ID for private endpoint (required if enablePrivateEndpoint is true)"
+      }
+    },
+    "subnetId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Subnet ID for private endpoint (required if enablePrivateEndpoint is true)"
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {},
+      "metadata": {
+        "description": "Tags to apply to resources"
+      }
+    }
+  },
+  "variables": {
+    "redisDnsZoneName": "privatelink.redis.cache.windows.net",
+    "privateEndpointName": "[format('{0}-pe', parameters('redisName'))]"
+  },
+  "resources": {
+    "redis": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "redis-deployment",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[parameters('redisName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "skuName": {
+            "value": "[parameters('skuName')]"
+          },
+          "clusteringPolicy": {
+            "value": "[parameters('clusteringPolicy')]"
+          },
+          "highAvailability": {
+            "value": "[parameters('highAvailability')]"
+          },
+          "evictionPolicy": {
+            "value": "[parameters('evictionPolicy')]"
+          },
+          "rdbEnabled": {
+            "value": "[parameters('rdbEnabled')]"
+          },
+          "rdbFrequency": {
+            "value": "[parameters('rdbFrequency')]"
+          },
+          "aofEnabled": {
+            "value": "[parameters('aofEnabled')]"
+          },
+          "aofFrequency": {
+            "value": "[parameters('aofFrequency')]"
+          },
+          "enableRediSearch": {
+            "value": "[parameters('enableRediSearch')]"
+          },
+          "enableRedisJSON": {
+            "value": "[parameters('enableRedisJSON')]"
+          },
+          "enableRedisTimeSeries": {
+            "value": "[parameters('enableRedisTimeSeries')]"
+          },
+          "enableRedisBloom": {
+            "value": "[parameters('enableRedisBloom')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "2.0",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.39.26.7824",
+              "templateHash": "4652488962029551369"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the Redis Enterprise cluster"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region for the resource"
+              }
+            },
+            "skuName": {
+              "type": "string",
+              "defaultValue": "Balanced_B5",
+              "allowedValues": [
+                "Balanced_B0",
+                "Balanced_B1",
+                "Balanced_B3",
+                "Balanced_B5",
+                "Balanced_B10",
+                "Balanced_B20",
+                "Balanced_B50",
+                "Balanced_B100",
+                "Balanced_B150",
+                "Balanced_B250",
+                "Balanced_B350",
+                "Balanced_B500",
+                "Balanced_B700",
+                "Balanced_B1000",
+                "MemoryOptimized_M10",
+                "MemoryOptimized_M20",
+                "MemoryOptimized_M50",
+                "MemoryOptimized_M100",
+                "MemoryOptimized_M150",
+                "MemoryOptimized_M250",
+                "MemoryOptimized_M350",
+                "MemoryOptimized_M500",
+                "MemoryOptimized_M700",
+                "MemoryOptimized_M1000",
+                "MemoryOptimized_M1500",
+                "MemoryOptimized_M2000",
+                "ComputeOptimized_X3",
+                "ComputeOptimized_X5",
+                "ComputeOptimized_X10",
+                "ComputeOptimized_X20",
+                "ComputeOptimized_X50",
+                "ComputeOptimized_X100",
+                "ComputeOptimized_X150",
+                "ComputeOptimized_X250",
+                "ComputeOptimized_X350",
+                "ComputeOptimized_X500",
+                "ComputeOptimized_X700",
+                "FlashOptimized_A250",
+                "FlashOptimized_A500",
+                "FlashOptimized_A700",
+                "FlashOptimized_A1000",
+                "FlashOptimized_A1500",
+                "FlashOptimized_A2000",
+                "FlashOptimized_A4500",
+                "Enterprise_E1",
+                "Enterprise_E5",
+                "Enterprise_E10",
+                "Enterprise_E20",
+                "Enterprise_E50",
+                "Enterprise_E100",
+                "Enterprise_E200",
+                "Enterprise_E400"
+              ],
+              "metadata": {
+                "description": "SKU name - supports both new Balanced_B* and legacy Enterprise_E* formats"
+              }
+            },
+            "clusteringPolicy": {
+              "type": "string",
+              "defaultValue": "OSSCluster",
+              "allowedValues": [
+                "EnterpriseCluster",
+                "OSSCluster"
+              ],
+              "metadata": {
+                "description": "Clustering policy - EnterpriseCluster for RediSearch, OSSCluster for max throughput"
+              }
+            },
+            "highAvailability": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enable high availability"
+              }
+            },
+            "minimumTlsVersion": {
+              "type": "string",
+              "defaultValue": "1.2",
+              "allowedValues": [
+                "1.0",
+                "1.1",
+                "1.2"
+              ],
+              "metadata": {
+                "description": "Minimum TLS version"
+              }
+            },
+            "accessKeysAuthenticationEnabled": {
+              "type": "bool",
+              "defaultValue": true,
+              "metadata": {
+                "description": "Enable access keys authentication"
+              }
+            },
+            "evictionPolicy": {
+              "type": "string",
+              "defaultValue": "VolatileLRU",
+              "allowedValues": [
+                "NoEviction",
+                "AllKeysLRU",
+                "AllKeysRandom",
+                "VolatileLRU",
+                "VolatileRandom",
+                "VolatileTTL",
+                "AllKeysLFU",
+                "VolatileLFU"
+              ],
+              "metadata": {
+                "description": "Eviction policy for the database"
+              }
+            },
+            "rdbEnabled": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enable RDB persistence"
+              }
+            },
+            "rdbFrequency": {
+              "type": "string",
+              "defaultValue": "1h",
+              "allowedValues": [
+                "1h",
+                "6h",
+                "12h"
+              ],
+              "metadata": {
+                "description": "RDB persistence frequency (1h, 6h, or 12h)"
+              }
+            },
+            "aofEnabled": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enable AOF persistence"
+              }
+            },
+            "aofFrequency": {
+              "type": "string",
+              "defaultValue": "1s",
+              "allowedValues": [
+                "1s",
+                "always"
+              ],
+              "metadata": {
+                "description": "AOF persistence frequency (1s or always)"
+              }
+            },
+            "enableRediSearch": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enable RediSearch module (requires EnterpriseCluster policy)"
+              }
+            },
+            "enableRedisJSON": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enable RedisJSON module"
+              }
+            },
+            "enableRedisTimeSeries": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enable RedisTimeSeries module"
+              }
+            },
+            "enableRedisBloom": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enable RedisBloom module"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags to apply to resources"
+              }
+            }
+          },
+          "variables": {
+            "modulesArray": "[concat(if(parameters('enableRediSearch'), createArray(createObject('name', 'RediSearch')), createArray()), if(parameters('enableRedisJSON'), createArray(createObject('name', 'RedisJSON')), createArray()), if(parameters('enableRedisTimeSeries'), createArray(createObject('name', 'RedisTimeSeries')), createArray()), if(parameters('enableRedisBloom'), createArray(createObject('name', 'RedisBloom')), createArray()))]",
+            "persistenceConfig": "[if(parameters('rdbEnabled'), createObject('rdbEnabled', true(), 'rdbFrequency', parameters('rdbFrequency'), 'aofEnabled', false()), if(parameters('aofEnabled'), createObject('aofEnabled', true(), 'aofFrequency', parameters('aofFrequency'), 'rdbEnabled', false()), createObject('rdbEnabled', false(), 'aofEnabled', false())))]"
+          },
+          "resources": {
+            "redisEnterprise": {
+              "type": "Microsoft.Cache/redisEnterprise",
+              "apiVersion": "2025-05-01-preview",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[union(parameters('tags'), createObject('managed-by', 'redismeter'))]",
+              "sku": {
+                "name": "[parameters('skuName')]"
+              },
+              "identity": {
+                "type": "None"
+              },
+              "properties": {
+                "minimumTlsVersion": "[parameters('minimumTlsVersion')]",
+                "highAvailability": "[if(parameters('highAvailability'), 'Enabled', 'Disabled')]"
+              }
+            },
+            "database": {
+              "type": "Microsoft.Cache/redisEnterprise/databases",
+              "apiVersion": "2025-05-01-preview",
+              "name": "[format('{0}/{1}', parameters('name'), 'default')]",
+              "properties": {
+                "clientProtocol": "Encrypted",
+                "port": 10000,
+                "clusteringPolicy": "[parameters('clusteringPolicy')]",
+                "evictionPolicy": "[parameters('evictionPolicy')]",
+                "persistence": "[variables('persistenceConfig')]",
+                "deferUpgrade": "NotDeferred",
+                "accessKeysAuthentication": "[if(parameters('accessKeysAuthenticationEnabled'), 'Enabled', 'Disabled')]",
+                "modules": "[variables('modulesArray')]"
+              },
+              "dependsOn": [
+                "redisEnterprise"
+              ]
+            }
+          },
+          "outputs": {
+            "id": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Cache/redisEnterprise', parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "value": "[parameters('name')]"
+            },
+            "hostName": {
+              "type": "string",
+              "value": "[reference('redisEnterprise').hostName]"
+            },
+            "databaseId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Cache/redisEnterprise/databases', parameters('name'), 'default')]"
+            },
+            "port": {
+              "type": "int",
+              "value": 10000
+            },
+            "primaryKey": {
+              "type": "securestring",
+              "value": "[listKeys('database', '2025-05-01-preview').primaryKey]"
+            },
+            "secondaryKey": {
+              "type": "securestring",
+              "value": "[listKeys('database', '2025-05-01-preview').secondaryKey]"
+            }
+          }
+        }
+      }
+    },
+    "redisDnsZone": {
+      "condition": "[and(parameters('enablePrivateEndpoint'), not(empty(parameters('vnetId'))))]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "redis-dns-zone-deployment",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('redisDnsZoneName')]"
+          },
+          "vnetId": {
+            "value": "[parameters('vnetId')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.39.26.7824",
+              "templateHash": "9042515124429093187"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the private DNS zone (e.g., privatelink.redis.cache.windows.net)"
+              }
+            },
+            "vnetId": {
+              "type": "string",
+              "metadata": {
+                "description": "Resource ID of the VNet to link"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags to apply to resources"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Network/privateDnsZones",
+              "apiVersion": "2020-06-01",
+              "name": "[parameters('name')]",
+              "location": "global",
+              "tags": "[union(parameters('tags'), createObject('managed-by', 'redismeter'))]",
+              "properties": {}
+            },
+            {
+              "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+              "apiVersion": "2020-06-01",
+              "name": "[format('{0}/{1}', parameters('name'), format('{0}-link', split(parameters('vnetId'), '/')[8]))]",
+              "location": "global",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "virtualNetwork": {
+                  "id": "[parameters('vnetId')]"
+                },
+                "registrationEnabled": false
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/privateDnsZones', parameters('name'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Network/privateDnsZones', parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "value": "[parameters('name')]"
+            }
+          }
+        }
+      }
+    },
+    "redisPrivateEndpoint": {
+      "condition": "[and(and(parameters('enablePrivateEndpoint'), not(empty(parameters('subnetId')))), not(empty(parameters('vnetId'))))]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "redis-pe-deployment",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('privateEndpointName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "subnetId": {
+            "value": "[parameters('subnetId')]"
+          },
+          "privateLinkServiceId": {
+            "value": "[reference('redis').outputs.id.value]"
+          },
+          "groupIds": {
+            "value": [
+              "redisEnterprise"
+            ]
+          },
+          "privateDnsZoneId": "[if(and(parameters('enablePrivateEndpoint'), not(empty(parameters('vnetId')))), createObject('value', reference('redisDnsZone').outputs.id.value), createObject('value', ''))]",
+          "databaseId": {
+            "value": "[reference('redis').outputs.databaseId.value]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.39.26.7824",
+              "templateHash": "3768878380031351430"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the private endpoint"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region for the resource"
+              }
+            },
+            "subnetId": {
+              "type": "string",
+              "metadata": {
+                "description": "Resource ID of the subnet for the private endpoint"
+              }
+            },
+            "privateLinkServiceId": {
+              "type": "string",
+              "metadata": {
+                "description": "Resource ID of the target service"
+              }
+            },
+            "groupIds": {
+              "type": "array",
+              "metadata": {
+                "description": "Group IDs for the private link (e.g., redisEnterprise, registry)"
+              }
+            },
+            "privateDnsZoneId": {
+              "type": "string",
+              "metadata": {
+                "description": "Resource ID of the private DNS zone"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags to apply to resources"
+              }
+            },
+            "databaseId": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Optional: Database ID to force dependency chain (ensures parent resource is fully ready)"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Network/privateEndpoints",
+              "apiVersion": "2023-05-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[union(parameters('tags'), createObject('managed-by', 'redismeter'))]",
+              "properties": {
+                "subnet": {
+                  "id": "[parameters('subnetId')]"
+                },
+                "privateLinkServiceConnections": [
+                  {
+                    "name": "[format('{0}-connection', parameters('name'))]",
+                    "properties": {
+                      "privateLinkServiceId": "[parameters('privateLinkServiceId')]",
+                      "groupIds": "[parameters('groupIds')]"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+              "apiVersion": "2023-05-01",
+              "name": "[format('{0}/{1}', parameters('name'), 'default')]",
+              "properties": {
+                "privateDnsZoneConfigs": [
+                  {
+                    "name": "config1",
+                    "properties": {
+                      "privateDnsZoneId": "[parameters('privateDnsZoneId')]"
+                    }
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/privateEndpoints', parameters('name'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Network/privateEndpoints', parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "value": "[parameters('name')]"
+            },
+            "privateIPAddress": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Network/privateEndpoints', parameters('name')), '2023-05-01').customDnsConfigs[0].ipAddresses[0]]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "redis",
+        "redisDnsZone"
+      ]
+    }
+  },
+  "outputs": {
+    "redisId": {
+      "type": "string",
+      "value": "[reference('redis').outputs.id.value]"
+    },
+    "redisName": {
+      "type": "string",
+      "value": "[reference('redis').outputs.name.value]"
+    },
+    "redisHostName": {
+      "type": "string",
+      "value": "[reference('redis').outputs.hostName.value]"
+    },
+    "redisDatabaseId": {
+      "type": "string",
+      "value": "[reference('redis').outputs.databaseId.value]"
+    },
+    "redisPort": {
+      "type": "int",
+      "value": "[reference('redis').outputs.port.value]"
+    },
+    "redisPrimaryKey": {
+      "type": "securestring",
+      "value": "[listOutputsWithSecureValues('redis', '2025-04-01').primaryKey]"
+    },
+    "redisSecondaryKey": {
+      "type": "securestring",
+      "value": "[listOutputsWithSecureValues('redis', '2025-04-01').secondaryKey]"
+    },
+    "privateEndpointId": {
+      "type": "string",
+      "value": "[if(and(and(parameters('enablePrivateEndpoint'), not(empty(parameters('subnetId')))), not(empty(parameters('vnetId')))), reference('redisPrivateEndpoint').outputs.id.value, '')]"
+    },
+    "privateEndpointIP": {
+      "type": "string",
+      "value": "[if(and(and(parameters('enablePrivateEndpoint'), not(empty(parameters('subnetId')))), not(empty(parameters('vnetId')))), reference('redisPrivateEndpoint').outputs.privateIPAddress.value, '')]"
+    }
+  }
+}

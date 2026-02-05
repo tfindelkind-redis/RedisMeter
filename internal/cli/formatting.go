@@ -6,6 +6,8 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -13,6 +15,233 @@ import (
 )
 
 // Formatting utilities for enhanced CLI output
+
+// Spinner provides an animated spinner with status updates.
+type Spinner struct {
+	mu         sync.Mutex
+	frames     []string
+	frameIdx   int
+	message    string
+	resource   string
+	elapsed    string
+	total      int
+	completed  int
+	active     bool
+	stopCh     chan struct{}
+	doneCh     chan struct{}
+}
+
+// NewSpinner creates a new spinner.
+func NewSpinner() *Spinner {
+	return &Spinner{
+		frames: []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"},
+	}
+}
+
+// Start begins the spinner animation.
+func (s *Spinner) Start(message string) {
+	s.mu.Lock()
+	// Reset channels for new start
+	s.stopCh = make(chan struct{})
+	s.doneCh = make(chan struct{})
+	s.message = message
+	s.active = true
+	s.mu.Unlock()
+
+	go func() {
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
+		defer close(s.doneCh)
+
+		for {
+			select {
+			case <-s.stopCh:
+				return
+			case <-ticker.C:
+				s.mu.Lock()
+				if !s.active {
+					s.mu.Unlock()
+					return
+				}
+				s.render()
+				s.frameIdx = (s.frameIdx + 1) % len(s.frames)
+				s.mu.Unlock()
+			}
+		}
+	}()
+}
+
+// Update updates the spinner message and status.
+func (s *Spinner) Update(message, resource, elapsed string, completed, total int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.message = message
+	s.resource = resource
+	s.elapsed = elapsed
+	s.completed = completed
+	s.total = total
+}
+
+// Stop stops the spinner.
+func (s *Spinner) Stop() {
+	s.mu.Lock()
+	if !s.active {
+		s.mu.Unlock()
+		return
+	}
+	s.active = false
+	stopCh := s.stopCh
+	doneCh := s.doneCh
+	s.mu.Unlock()
+
+	close(stopCh)
+	<-doneCh
+
+	// Clear the line
+	fmt.Print("\r\033[K")
+}
+
+// Success stops the spinner with a success message.
+func (s *Spinner) Success(message string) {
+	s.Stop()
+	fmt.Printf("  %s %s\n", color.GreenString("✓"), message)
+}
+
+// Fail stops the spinner with a failure message.
+func (s *Spinner) Fail(message string) {
+	s.Stop()
+	fmt.Printf("  %s %s\n", color.RedString("✗"), message)
+}
+
+func (s *Spinner) render() {
+	frame := color.CyanString(s.frames[s.frameIdx])
+
+	// Build status line
+	var status strings.Builder
+	status.WriteString(fmt.Sprintf("\r  %s %s", frame, s.message))
+
+	if s.resource != "" {
+		status.WriteString(fmt.Sprintf(" %s", color.YellowString(s.resource)))
+	}
+
+	if s.elapsed != "" {
+		status.WriteString(fmt.Sprintf(" %s", color.HiBlackString("[%s]", s.elapsed)))
+	}
+
+	if s.total > 0 {
+		progress := float64(s.completed) / float64(s.total)
+		status.WriteString(fmt.Sprintf(" %s", color.HiBlackString("(%d/%d)", s.completed, s.total)))
+		// Mini progress bar
+		bar := miniProgressBar(progress, 10)
+		status.WriteString(fmt.Sprintf(" %s", bar))
+	}
+
+	// Pad to clear previous line content
+	status.WriteString(strings.Repeat(" ", 20))
+
+	fmt.Print(status.String())
+}
+
+func miniProgressBar(progress float64, width int) string {
+	if progress < 0 {
+		progress = 0
+	}
+	if progress > 1 {
+		progress = 1
+	}
+	filled := int(progress * float64(width))
+	empty := width - filled
+	return fmt.Sprintf("%s%s",
+		color.GreenString(strings.Repeat("█", filled)),
+		color.HiBlackString(strings.Repeat("░", empty)))
+}
+
+// InfraProgressDisplay provides a rich progress display for infrastructure operations.
+type InfraProgressDisplay struct {
+	spinner   *Spinner
+	phase     string
+	startTime time.Time
+	resources map[string]string // resource -> status
+	mu        sync.Mutex
+}
+
+// NewInfraProgressDisplay creates a new infrastructure progress display.
+func NewInfraProgressDisplay() *InfraProgressDisplay {
+	return &InfraProgressDisplay{
+		spinner:   NewSpinner(),
+		resources: make(map[string]string),
+		startTime: time.Now(),
+	}
+}
+
+// Start begins the progress display.
+func (p *InfraProgressDisplay) Start(phase string) {
+	p.mu.Lock()
+	p.phase = phase
+	p.startTime = time.Now()
+	p.mu.Unlock()
+
+	var msg string
+	switch phase {
+	case "init":
+		msg = "Initializing Terraform..."
+	case "apply":
+		msg = "Creating resources..."
+	case "destroy":
+		msg = "Destroying resources..."
+	default:
+		msg = "Working..."
+	}
+	p.spinner.Start(msg)
+}
+
+// Update processes a terraform event.
+func (p *InfraProgressDisplay) Update(action, resource, elapsed string, completed, total int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	// Track resource status
+	if resource != "" {
+		p.resources[resource] = action
+	}
+
+	var msg string
+	switch action {
+	case "creating":
+		msg = "Creating"
+	case "created":
+		msg = "Created"
+	case "destroying":
+		msg = "Destroying"
+	case "destroyed":
+		msg = "Destroyed"
+	case "waiting":
+		msg = "Waiting for"
+	case "refreshing":
+		msg = "Refreshing"
+	case "complete":
+		msg = "Complete"
+	default:
+		msg = p.phase
+	}
+
+	p.spinner.Update(msg, resource, elapsed, completed, total)
+}
+
+// Success marks the operation as successful.
+func (p *InfraProgressDisplay) Success(message string) {
+	p.spinner.Success(message)
+}
+
+// Fail marks the operation as failed.
+func (p *InfraProgressDisplay) Fail(message string) {
+	p.spinner.Fail(message)
+}
+
+// Stop stops the display.
+func (p *InfraProgressDisplay) Stop() {
+	p.spinner.Stop()
+}
 
 // TableWriter helps create formatted table output.
 type TableWriter struct {

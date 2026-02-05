@@ -201,6 +201,9 @@ func (e *Engine) Run(ctx context.Context, cfg *RunConfig, progress ProgressCallb
 		return run, err
 	}
 
+	// Always preserve raw memtier output for debugging and analysis
+	results.RawOutput = string(result.RawJSON)
+
 	run.Results = results
 	run.Status = domain.RunStatusCompleted
 	run.UpdatedAt = time.Now()

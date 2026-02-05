@@ -84,7 +84,7 @@ type InfraSpec struct {
 
 // NodeGroupSpec defines a group of instances.
 type NodeGroupSpec struct {
-	// InstanceType is the instance type/size.
+	// InstanceType is the instance type/size (e.g., Standard_D4s_v3 for Azure).
 	InstanceType string `json:"instance_type"`
 
 	// Count is the number of instances.
@@ -99,17 +99,17 @@ type NodeGroupSpec struct {
 	// DiskSizeGB is the root disk size.
 	DiskSizeGB int `json:"disk_size_gb,omitempty"`
 
-	// Image is the OS image (optional, defaults to latest Ubuntu).
-	Image string `json:"image,omitempty"`
-
 	// SSHKeyName is the SSH key to use (must exist in provider).
 	SSHKeyName string `json:"ssh_key_name,omitempty"`
 
 	// SSHPublicKey is the SSH public key content (alternative to SSHKeyName).
 	SSHPublicKey string `json:"ssh_public_key,omitempty"`
 
-	// UserData is cloud-init or startup script.
+	// UserData is cloud-init or startup script (appended to default memtier setup).
 	UserData string `json:"user_data,omitempty"`
+
+	// Note: OS Image is NOT configurable - Ubuntu 22.04 LTS is enforced
+	// for compatibility with memtier_benchmark installation.
 }
 
 // RedisTargetSpec defines Redis target configuration.
@@ -117,13 +117,18 @@ type RedisTargetSpec struct {
 	// Type is the Redis deployment type.
 	Type RedisTargetType `json:"type"`
 
-	// Managed configuration for managed Redis services.
+	// Managed configuration for managed Redis services (legacy: AWS ElastiCache, GCP Memorystore).
 	Managed *ManagedRedisSpec `json:"managed,omitempty"`
+
+	// AzureManagedRedis configuration for Azure Managed Redis (AMR).
+	// This is the preferred way to configure AMR targets.
+	AzureManagedRedis *AzureManagedRedisSpec `json:"azure_managed_redis,omitempty"`
 
 	// SelfHosted configuration for self-managed Redis.
 	SelfHosted *SelfHostedRedisSpec `json:"self_hosted,omitempty"`
 
 	// ExistingEndpoint connects to an existing Redis instance.
+	// For AMR, use AzureManagedRedis with Mode=existing instead.
 	ExistingEndpoint string `json:"existing_endpoint,omitempty"`
 }
 
@@ -131,10 +136,62 @@ type RedisTargetSpec struct {
 type RedisTargetType string
 
 const (
-	RedisTargetManaged    RedisTargetType = "managed"    // AWS ElastiCache, GCP Memorystore, etc.
-	RedisTargetSelfHosted RedisTargetType = "self_hosted" // Redis on VMs
-	RedisTargetExisting   RedisTargetType = "existing"   // Connect to existing
+	RedisTargetManaged           RedisTargetType = "managed"              // AWS ElastiCache, GCP Memorystore, etc.
+	RedisTargetAzureManagedRedis RedisTargetType = "azure_managed_redis"  // Azure Managed Redis (AMR)
+	RedisTargetSelfHosted        RedisTargetType = "self_hosted"          // Redis on VMs
+	RedisTargetExisting          RedisTargetType = "existing"             // Connect to existing (direct endpoint)
 )
+
+// AzureManagedRedisSpec defines Azure Managed Redis (AMR) configuration.
+// AMR is based on Redis Enterprise and provides enterprise-grade features.
+type AzureManagedRedisSpec struct {
+	// Mode determines how to connect to Redis.
+	// - "provision": Create a new AMR instance using Template
+	// - "existing": Connect to an existing AMR instance using ResourceID
+	// - "endpoint": Connect to any Redis using direct Endpoint (user handles networking)
+	Mode string `json:"mode"` // provision, existing, endpoint
+
+	// Template to use for creating new AMR instance (for mode=provision).
+	// Available templates: dev-test, balanced, balanced-ha, high-performance, memory-optimized
+	Template string `json:"template,omitempty"`
+
+	// ResourceID of existing AMR cluster (for mode=existing).
+	// Format: /subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.Cache/redisEnterprise/{name}
+	ResourceID string `json:"resource_id,omitempty"`
+
+	// Endpoint for direct connection (for mode=endpoint).
+	Endpoint string `json:"endpoint,omitempty"`
+	Port     int    `json:"port,omitempty"`
+	Password string `json:"password,omitempty"`
+
+	// Network configuration for AMR connectivity.
+	Network *AzureManagedRedisNetworkSpec `json:"network,omitempty"`
+}
+
+// AzureManagedRedisNetworkSpec defines networking for AMR connectivity.
+type AzureManagedRedisNetworkSpec struct {
+	// UseExistingVNet - if true, deploy runner VMs into an existing VNet.
+	// This is required when AMR doesn't have public access enabled.
+	UseExistingVNet bool `json:"use_existing_vnet,omitempty"`
+
+	// ExistingVNetID - Resource ID of existing VNet (required if UseExistingVNet=true).
+	// Format: /subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.Network/virtualNetworks/{name}
+	ExistingVNetID string `json:"existing_vnet_id,omitempty"`
+
+	// ExistingSubnetName - Name of subnet within the VNet for runner VMs.
+	ExistingSubnetName string `json:"existing_subnet_name,omitempty"`
+
+	// CreatePrivateEndpoint - Create a private endpoint for AMR in the runner VNet.
+	// Required if AMR doesn't have public access enabled and VNets are different.
+	CreatePrivateEndpoint bool `json:"create_private_endpoint,omitempty"`
+
+	// PrivateEndpointSubnetName - Subnet for the private endpoint.
+	PrivateEndpointSubnetName string `json:"private_endpoint_subnet_name,omitempty"`
+
+	// AllowPublicAccess - For new AMR instances, whether to allow public network access.
+	// Recommended: false (use private endpoints instead for production).
+	AllowPublicAccess bool `json:"allow_public_access,omitempty"`
+}
 
 // ManagedRedisSpec defines managed Redis service configuration.
 type ManagedRedisSpec struct {

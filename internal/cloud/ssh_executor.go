@@ -79,17 +79,52 @@ type sshExecution struct {
 	done      chan struct{}
 }
 
-// NewSSHExecutor creates a new SSH executor.
-func NewSSHExecutor() *SSHExecutor {
+// NewSSHExecutor creates a new SSH executor with default config.
+func NewSSHExecutor(config ...SSHConfig) *SSHExecutor {
+	cfg := SSHConfig{
+		Port:           22,
+		ConnectTimeout: 30 * time.Second,
+		CommandTimeout: 5 * time.Minute,
+		MemtierPath:    "memtier_benchmark",
+	}
+	
+	// Allow overriding with provided config
+	if len(config) > 0 {
+		c := config[0]
+		if c.User != "" {
+			cfg.User = c.User
+		}
+		if c.PrivateKeyPath != "" {
+			cfg.PrivateKeyPath = c.PrivateKeyPath
+		}
+		if c.PrivateKey != "" {
+			cfg.PrivateKey = c.PrivateKey
+		}
+		if c.Password != "" {
+			cfg.Password = c.Password
+		}
+		if c.Port != 0 {
+			cfg.Port = c.Port
+		}
+		if c.ConnectTimeout != 0 {
+			cfg.ConnectTimeout = c.ConnectTimeout
+		}
+		if c.CommandTimeout != 0 {
+			cfg.CommandTimeout = c.CommandTimeout
+		}
+		if c.KnownHostsPath != "" {
+			cfg.KnownHostsPath = c.KnownHostsPath
+		}
+		cfg.StrictHostKeyChecking = c.StrictHostKeyChecking
+		if c.MemtierPath != "" {
+			cfg.MemtierPath = c.MemtierPath
+		}
+	}
+	
 	return &SSHExecutor{
 		connections: make(map[string]*sshConnection),
 		executions:  make(map[string]*sshExecution),
-		config: SSHConfig{
-			Port:           22,
-			ConnectTimeout: 30 * time.Second,
-			CommandTimeout: 5 * time.Minute,
-			MemtierPath:    "memtier_benchmark",
-		},
+		config:      cfg,
 	}
 }
 
@@ -309,6 +344,31 @@ func (e *SSHExecutor) GetOutput(handle *plugin.ExecutionHandle) (string, error) 
 // Connect establishes an SSH connection to a host.
 func (e *SSHExecutor) Connect(ctx context.Context, host string) error {
 	_, err := e.getOrCreateConnection(ctx, host)
+	return err
+}
+
+// TestConnection tests if SSH connection can be established to a host.
+// Unlike Connect, this doesn't cache the connection and is meant for health checks.
+func (e *SSHExecutor) TestConnection(ctx context.Context, host string) error {
+	// Try to establish a connection
+	conn, err := e.getOrCreateConnection(ctx, host)
+	if err != nil {
+		return err
+	}
+
+	// Verify connection is alive by running a simple command
+	session, err := conn.client.NewSession()
+	if err != nil {
+		// Connection might be stale, remove it from cache
+		e.mu.Lock()
+		delete(e.connections, host)
+		e.mu.Unlock()
+		return fmt.Errorf("failed to create session: %w", err)
+	}
+	defer session.Close()
+
+	// Run a simple echo to verify the connection works
+	_, err = session.Output("echo ok")
 	return err
 }
 

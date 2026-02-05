@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	osExec "os/exec"
+	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -197,9 +199,66 @@ func getCloudProvider(ctx context.Context, provider string) (cloud.ProviderPlugi
 	}
 
 	var p cloud.ProviderPlugin
+	var err error
 	switch provider {
 	case "aws":
 		p = cloud.NewAWSProvider()
+	case "azure":
+		// Get subscription ID
+		subID := viper.GetString("azure.subscription_id")
+		if subID == "" {
+			// Try from environment
+			subID = os.Getenv("AZURE_SUBSCRIPTION_ID")
+		}
+		if subID == "" {
+			// Try from az CLI
+			cmd := osExec.Command("az", "account", "show", "--query", "id", "-o", "tsv")
+			out, cmdErr := cmd.Output()
+			if cmdErr == nil {
+				subID = strings.TrimSpace(string(out))
+			}
+		}
+		if subID == "" {
+			return nil, fmt.Errorf("Azure subscription ID not found. Set AZURE_SUBSCRIPTION_ID or run 'az login'")
+		}
+		
+		// Get SSH public key
+		sshPubKey := viper.GetString("azure.ssh_public_key")
+		if sshPubKey == "" {
+			// Try reading from default location
+			homeDir, _ := os.UserHomeDir()
+			defaultPubKeyPath := homeDir + "/.ssh/id_rsa.pub"
+			if pubKeyData, readErr := os.ReadFile(defaultPubKeyPath); readErr == nil {
+				sshPubKey = strings.TrimSpace(string(pubKeyData))
+			}
+		}
+		if sshPubKey == "" {
+			return nil, fmt.Errorf("SSH public key not found. Set azure.ssh_public_key in config or create ~/.ssh/id_rsa.pub")
+		}
+		
+		// Get SSH private key path
+		sshPrivKey := viper.GetString("ssh.private_key_path")
+		if sshPrivKey == "" {
+			homeDir, _ := os.UserHomeDir()
+			sshPrivKey = homeDir + "/.ssh/id_rsa"
+		}
+		
+		// Get SSH user with default
+		sshUser := viper.GetString("ssh.user")
+		if sshUser == "" {
+			sshUser = "azureuser"
+		}
+		
+		azConfig := cloud.AzureConfig{
+			SubscriptionID: subID,
+			SSHPublicKey:   sshPubKey,
+			SSHPrivateKey:  sshPrivKey,
+			SSHUser:        sshUser,
+		}
+		p, err = cloud.NewAzureProvider(azConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create Azure provider: %w", err)
+		}
 	default:
 		return nil, fmt.Errorf("unsupported cloud provider: %s", provider)
 	}
@@ -226,6 +285,19 @@ func getCloudProvider(ctx context.Context, provider string) (cloud.ProviderPlugi
 		}
 		if subnetID := viper.GetString("aws.default_subnet_id"); subnetID != "" {
 			config["default_subnet_id"] = subnetID
+		}
+	}
+
+	// Azure config
+	if provider == "azure" {
+		if subID := viper.GetString("azure.subscription_id"); subID != "" {
+			config["subscription_id"] = subID
+		}
+		if sshKey := viper.GetString("azure.ssh_public_key"); sshKey != "" {
+			config["ssh_public_key"] = sshKey
+		}
+		if sshKeyPath := viper.GetString("ssh.private_key_path"); sshKeyPath != "" {
+			config["ssh_private_key"] = sshKeyPath
 		}
 	}
 
