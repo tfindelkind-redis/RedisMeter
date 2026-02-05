@@ -64,12 +64,13 @@ func TestCommandBuilder(t *testing.T) {
 		{
 			name: "with TLS",
 			config: &Config{
-				Host:    "localhost",
-				Port:    6379,
-				TLS:     true,
-				Threads: 1,
-				Clients: 1,
-				Ratio:   "1:4",
+				Host:          "localhost",
+				Port:          6379,
+				TLS:           true,
+				TLSSkipVerify: true,
+				Threads:       1,
+				Clients:       1,
+				Ratio:         "1:4",
 			},
 			wantArgs: []string{
 				"--tls",

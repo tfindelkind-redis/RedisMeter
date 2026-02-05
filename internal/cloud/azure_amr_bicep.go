@@ -71,10 +71,10 @@ type AMRBicepDeploymentParams struct {
 	AOFFrequency string `json:"aofFrequency"` // 1s, always
 
 	// Modules
-	EnableRediSearch    bool `json:"enableRediSearch"`
-	EnableRedisJSON     bool `json:"enableRedisJSON"`
+	EnableRediSearch      bool `json:"enableRediSearch"`
+	EnableRedisJSON       bool `json:"enableRedisJSON"`
 	EnableRedisTimeSeries bool `json:"enableRedisTimeSeries"`
-	EnableRedisBloom    bool `json:"enableRedisBloom"`
+	EnableRedisBloom      bool `json:"enableRedisBloom"`
 
 	// Private endpoint (optional)
 	EnablePrivateEndpoint bool   `json:"enablePrivateEndpoint"`
@@ -87,12 +87,12 @@ type AMRBicepDeploymentParams struct {
 
 // AMRBicepDeploymentResult contains the results from a Bicep deployment.
 type AMRBicepDeploymentResult struct {
-	RedisID          string `json:"redisId"`
-	RedisName        string `json:"redisName"`
-	RedisHostName    string `json:"redisHostName"`
-	RedisDatabaseID  string `json:"redisDatabaseId"`
-	RedisPort        int    `json:"redisPort"`
-	RedisPrimaryKey  string `json:"redisPrimaryKey"`
+	RedisID           string `json:"redisId"`
+	RedisName         string `json:"redisName"`
+	RedisHostName     string `json:"redisHostName"`
+	RedisDatabaseID   string `json:"redisDatabaseId"`
+	RedisPort         int    `json:"redisPort"`
+	RedisPrimaryKey   string `json:"redisPrimaryKey"`
 	RedisSecondaryKey string `json:"redisSecondaryKey"`
 	PrivateEndpointID string `json:"privateEndpointId,omitempty"`
 	PrivateEndpointIP string `json:"privateEndpointIp,omitempty"`

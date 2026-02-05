@@ -8,6 +8,9 @@ import {
   PlusOutlined,
   LineChartOutlined,
   CloudOutlined,
+  ExperimentOutlined,
+  SettingOutlined,
+  AppstoreOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '@/store';
@@ -49,6 +52,21 @@ export default function Sidebar() {
       key: '/infrastructure',
       icon: <CloudOutlined />,
       label: 'Cloud Infrastructure',
+    },
+    {
+      key: '/infra-profiles',
+      icon: <AppstoreOutlined />,
+      label: 'Infrastructure Profiles',
+    },
+    {
+      key: '/workloads',
+      icon: <ExperimentOutlined />,
+      label: 'Workload Profiles',
+    },
+    {
+      key: '/run-profiles',
+      icon: <SettingOutlined />,
+      label: 'Run Profiles',
     },
     {
       type: 'divider' as const,

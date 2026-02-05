@@ -12,41 +12,105 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/tfindelkind-redis/redismeter/internal/domain"
 )
 
 // Config holds memtier_benchmark configuration options.
 type Config struct {
-	// Connection
-	Host     string
-	Port     int
-	Password string
-	Username string
-	TLS      bool
-	Cluster  bool
+	// Connection - Basic
+	Host       string
+	Port       int
+	UnixSocket string // UNIX Domain socket path
+	Password   string
+	Username   string
+	URI        string // redis://user:password@host:port/dbnum
 
-	// Workload
-	Ratio       string // e.g., "1:1" for 50% GET, 50% SET
-	KeyPattern  string // random, sequential, gaussian
-	KeyMinimum  int64
-	KeyMaximum  int64
-	KeyPrefix   string
-	DataSize    int
-	DataSizeMin int
-	DataSizeMax int
-	Expiry      int
+	// Connection - TLS
+	TLS           bool
+	TLSCert       string // Client certificate file
+	TLSKey        string // Private key file
+	TLSCACert     string // CA certs bundle
+	TLSSkipVerify bool   // Skip server cert verification
+	TLSProtocols  string // TLS version: TLSv1,TLSv1.1,TLSv1.2,TLSv1.3
+	TLSSNI        string // SNI header
 
-	// Execution
-	Threads     int
-	Clients     int
-	Requests    int64
-	Duration    time.Duration
-	Pipeline    int
-	RateLimit   int
-	Randomize   bool
+	// Connection - Network
+	ForceIPv4 bool // Force IPv4 resolution
+	ForceIPv6 bool // Force IPv6 resolution
+	Cluster   bool // Redis cluster mode
 
-	// Output
-	JSONOutput bool
-	HideHistogram bool
+	// Workload settings (WHAT to test)
+	Ratio        string  // e.g., "1:1" for 50% GET, 50% SET
+	KeyPattern   string  // R=random, S=sequential, G=gaussian, Z=zipf, P=parallel
+	KeyMinimum   int64
+	KeyMaximum   int64
+	KeyPrefix    string
+	KeyStddev    float64 // For Gaussian distribution
+	KeyMedian    int64   // For Gaussian distribution
+	ZipfExponent float64 // For Zipf distribution (0-5)
+
+	// Workload - Data size
+	DataSize     int
+	DataSizeMin  int
+	DataSizeMax  int
+	DataSizeList string // Weighted list: "size1:weight1,size2:weight2"
+	DataPattern  string // R=random, S=sequential
+	RandomData   bool   // Randomize data content
+	DataOffset   int    // Use SETRANGE/GETRANGE with offset
+	ExpiryMin    int
+	ExpiryMax    int
+
+	// Data import options
+	DataImport   string // File to import data from
+	DataVerify   bool   // Verify imported data after test
+	VerifyOnly   bool   // Only verify, no other test
+	GenerateKeys bool   // Generate keys for imported objects
+	NoExpiry     bool   // Ignore expiry in imported data
+
+	// Custom commands
+	CustomCommands []CustomCommand
+
+	// Run profile settings (HOW to run)
+	Threads            int
+	Clients            int
+	Requests           int64
+	Duration           time.Duration
+	Pipeline           int
+	RateLimit          int
+	RunCount           int    // Number of test iterations
+	ReconnectInterval  int    // Reconnect after N requests
+	Protocol           string // redis, resp2, resp3
+	SelectDB           int    // Redis DB number
+	DistinctClientSeed bool
+	RandomizeSeed      bool
+	MultiKeyGet        int // Multi-key GET up to N keys
+
+	// WAIT options (for replication)
+	WaitRatio      string // Set:Wait ratio (default no WAIT)
+	NumSlavesMin   int    // WAIT for min slaves
+	NumSlavesMax   int    // WAIT for max slaves
+	WaitTimeoutMin int    // WAIT timeout min (ms)
+	WaitTimeoutMax int    // WAIT timeout max (ms)
+
+	// Output options
+	JSONOutput       bool
+	JSONOutFile      string   // JSON output file path
+	OutFile          string   // Output file path
+	HdrFilePrefix    string   // HDR histogram file prefix
+	ClientStats      string   // Per-client stats file
+	HideHistogram    bool
+	PrintPercentiles []float64
+	PrintAllRuns     bool   // Print results for all iterations
+	ShowConfig       bool   // Print detailed config before running
+	Debug            bool   // Print debug output
+}
+
+// CustomCommand for arbitrary memtier commands.
+type CustomCommand struct {
+	Command    string
+	Ratio      int
+	KeyPattern string
 }
 
 // DefaultConfig returns a config with sensible defaults.
@@ -55,16 +119,169 @@ func DefaultConfig() *Config {
 		Host:       "localhost",
 		Port:       6379,
 		Ratio:      "1:1",
-		KeyPattern: "R", // random
-		KeyMinimum: 1,
+		KeyPattern: "R:R", // random for both SET and GET
+		KeyMinimum: 1,     // memtier requires > 0
 		KeyMaximum: 10000000,
 		DataSize:   32,
 		Threads:    4,
 		Clients:    50,
 		Duration:   30 * time.Second,
 		Pipeline:   1,
+		RunCount:   1,
+		Protocol:   "redis",
 		JSONOutput: true,
 	}
+}
+
+// FromWorkloadAndRunProfile creates a Config from domain models.
+func FromWorkloadAndRunProfile(workload *domain.Workload, runProfile *domain.RunProfile) *Config {
+	cfg := DefaultConfig()
+
+	// Apply workload settings (WHAT to test)
+	if workload != nil {
+		// Calculate ratio from operations
+		var getRatio, setRatio float64
+		for _, op := range workload.Operations {
+			switch strings.ToUpper(op.Command) {
+			case "GET":
+				getRatio += op.Ratio
+			case "SET":
+				setRatio += op.Ratio
+			}
+		}
+		if getRatio > 0 || setRatio > 0 {
+			// Convert to memtier ratio format (SET:GET)
+			if getRatio == 0 {
+				cfg.Ratio = "1:0"
+			} else if setRatio == 0 {
+				cfg.Ratio = "0:1"
+			} else {
+				// Normalize to simple ratio
+				total := getRatio + setRatio
+				setNorm := int(setRatio / total * 10)
+				getNorm := int(getRatio / total * 10)
+				cfg.Ratio = fmt.Sprintf("%d:%d", setNorm, getNorm)
+			}
+		}
+
+		// Key pattern
+		if workload.KeyPattern != nil {
+			kp := workload.KeyPattern
+			cfg.KeyPrefix = kp.Prefix
+			switch strings.ToLower(kp.Pattern) {
+			case "random":
+				cfg.KeyPattern = "R:R"
+			case "sequential":
+				cfg.KeyPattern = "S:S"
+			case "gaussian":
+				cfg.KeyPattern = "G:G"
+			case "zipf":
+				cfg.KeyPattern = "Z:Z"
+			case "parallel":
+				cfg.KeyPattern = "P:P"
+			default:
+				cfg.KeyPattern = kp.Pattern
+			}
+			if kp.KeyMin > 0 {
+				cfg.KeyMinimum = kp.KeyMin
+			}
+			if kp.KeyMax > 0 {
+				cfg.KeyMaximum = kp.KeyMax
+			} else if kp.KeyRange > 0 {
+				cfg.KeyMaximum = kp.KeyRange
+			}
+			cfg.KeyStddev = kp.KeyStddev
+			cfg.KeyMedian = kp.KeyMedian
+			cfg.ZipfExponent = kp.ZipfExponent
+		}
+
+		// Data size
+		if workload.DataSize != nil {
+			ds := workload.DataSize
+			if ds.Fixed > 0 {
+				cfg.DataSize = ds.Fixed
+			} else {
+				cfg.DataSizeMin = ds.Min
+				cfg.DataSizeMax = ds.Max
+			}
+			cfg.DataSizeList = ds.SizeList
+			cfg.DataPattern = ds.SizePattern
+		}
+
+		cfg.RandomData = workload.RandomData
+		cfg.DataOffset = workload.DataOffset
+		cfg.ExpiryMin = workload.ExpiryMin
+		cfg.ExpiryMax = workload.ExpiryMax
+
+		// Custom commands
+		for _, cc := range workload.CustomCommands {
+			cfg.CustomCommands = append(cfg.CustomCommands, CustomCommand{
+				Command:    cc.Command,
+				Ratio:      cc.Ratio,
+				KeyPattern: cc.KeyPattern,
+			})
+		}
+
+		// Backwards compatibility: use workload execution settings if no run profile
+		if runProfile == nil {
+			if workload.Threads > 0 {
+				cfg.Threads = workload.Threads
+			}
+			if workload.Clients > 0 {
+				cfg.Clients = workload.Clients
+			}
+			if workload.Duration != "" {
+				if d, err := time.ParseDuration(workload.Duration); err == nil {
+					cfg.Duration = d
+				}
+			}
+			if workload.Requests > 0 {
+				cfg.Requests = workload.Requests
+			}
+			if workload.Pipeline > 0 {
+				cfg.Pipeline = workload.Pipeline
+			}
+			if workload.RateLimiting != nil && workload.RateLimiting.RequestsPerSecond > 0 {
+				cfg.RateLimit = workload.RateLimiting.RequestsPerSecond
+			}
+		}
+	}
+
+	// Apply run profile settings (HOW to run) - these override workload settings
+	if runProfile != nil {
+		if runProfile.Threads > 0 {
+			cfg.Threads = runProfile.Threads
+		}
+		if runProfile.Clients > 0 {
+			cfg.Clients = runProfile.Clients
+		}
+		if runProfile.Duration != "" {
+			if d, err := time.ParseDuration(runProfile.Duration); err == nil {
+				cfg.Duration = d
+			}
+		}
+		if runProfile.Requests > 0 {
+			cfg.Requests = runProfile.Requests
+			cfg.Duration = 0 // Requests override duration
+		}
+		if runProfile.Pipeline > 0 {
+			cfg.Pipeline = runProfile.Pipeline
+		}
+		cfg.RateLimit = runProfile.RateLimit
+		cfg.RunCount = runProfile.RunCount
+		cfg.ReconnectInterval = runProfile.ReconnectInterval
+		if runProfile.Protocol != "" {
+			cfg.Protocol = runProfile.Protocol
+		}
+		cfg.SelectDB = runProfile.SelectDB
+		cfg.DistinctClientSeed = runProfile.DistinctClientSeed
+		cfg.RandomizeSeed = runProfile.RandomizeSeed
+		cfg.MultiKeyGet = runProfile.MultiKeyGet
+		cfg.HideHistogram = runProfile.HideHistogram
+		cfg.PrintPercentiles = runProfile.PrintPercentiles
+	}
+
+	return cfg
 }
 
 // CommandBuilder builds memtier_benchmark command arguments.
@@ -81,70 +298,273 @@ func NewCommandBuilder(config *Config) *CommandBuilder {
 func (b *CommandBuilder) Build() []string {
 	args := []string{}
 
-	// Connection
-	args = append(args, "-s", b.config.Host)
-	args = append(args, "-p", strconv.Itoa(b.config.Port))
+	// Connection - Basic
+	if b.config.UnixSocket != "" {
+		args = append(args, "-S", b.config.UnixSocket)
+	} else if b.config.URI != "" {
+		args = append(args, "-u", b.config.URI)
+	} else {
+		args = append(args, "-s", b.config.Host)
+		args = append(args, "-p", strconv.Itoa(b.config.Port))
+	}
 
 	if b.config.Password != "" {
 		args = append(args, "-a", b.config.Password)
 	}
 	if b.config.Username != "" {
+		// For Redis 6+ ACL: user:password format in -a
+		// Or use separate user flag if available
 		args = append(args, "--user", b.config.Username)
 	}
+
+	// Connection - Network
+	if b.config.ForceIPv4 {
+		args = append(args, "-4")
+	}
+	if b.config.ForceIPv6 {
+		args = append(args, "-6")
+	}
+
+	// Connection - TLS
 	if b.config.TLS {
 		args = append(args, "--tls")
-		args = append(args, "--tls-skip-verify")
+		if b.config.TLSCert != "" {
+			args = append(args, "--cert", b.config.TLSCert)
+		}
+		if b.config.TLSKey != "" {
+			args = append(args, "--key", b.config.TLSKey)
+		}
+		if b.config.TLSCACert != "" {
+			args = append(args, "--cacert", b.config.TLSCACert)
+		}
+		if b.config.TLSSkipVerify {
+			args = append(args, "--tls-skip-verify")
+		}
+		if b.config.TLSProtocols != "" {
+			args = append(args, "--tls-protocols", b.config.TLSProtocols)
+		}
+		if b.config.TLSSNI != "" {
+			args = append(args, "--sni", b.config.TLSSNI)
+		}
 	}
+
+	// Cluster mode
 	if b.config.Cluster {
 		args = append(args, "--cluster-mode")
 	}
 
-	// Workload
-	args = append(args, "--ratio", b.config.Ratio)
-	args = append(args, "--key-pattern", b.config.KeyPattern)
-	args = append(args, "--key-minimum", strconv.FormatInt(b.config.KeyMinimum, 10))
+	// Protocol
+	if b.config.Protocol != "" && b.config.Protocol != "redis" {
+		args = append(args, "-P", b.config.Protocol)
+	}
+
+	// DB selection
+	if b.config.SelectDB > 0 {
+		args = append(args, "--select-db", strconv.Itoa(b.config.SelectDB))
+	}
+
+	// Check if we're using custom commands (they conflict with --ratio and --key-pattern)
+	hasCustomCommands := len(b.config.CustomCommands) > 0
+
+	// Workload - Key settings (only if NOT using custom commands)
+	if !hasCustomCommands {
+		args = append(args, "--ratio", b.config.Ratio)
+		
+		// Ensure key-pattern is in correct format (X:X)
+		keyPattern := b.config.KeyPattern
+		if keyPattern != "" && !strings.Contains(keyPattern, ":") {
+			keyPattern = keyPattern + ":" + keyPattern
+		}
+		args = append(args, "--key-pattern", keyPattern)
+	}
+	
+	// Key range (always needed) - ensure key-minimum > 0
+	keyMin := b.config.KeyMinimum
+	if keyMin <= 0 {
+		keyMin = 1
+	}
+	args = append(args, "--key-minimum", strconv.FormatInt(keyMin, 10))
 	args = append(args, "--key-maximum", strconv.FormatInt(b.config.KeyMaximum, 10))
 
 	if b.config.KeyPrefix != "" {
 		args = append(args, "--key-prefix", b.config.KeyPrefix)
 	}
+	if b.config.KeyStddev > 0 {
+		args = append(args, "--key-stddev", strconv.FormatFloat(b.config.KeyStddev, 'f', -1, 64))
+	}
+	if b.config.KeyMedian > 0 {
+		args = append(args, "--key-median", strconv.FormatInt(b.config.KeyMedian, 10))
+	}
+	if b.config.ZipfExponent > 0 {
+		args = append(args, "--key-zipf-exp", strconv.FormatFloat(b.config.ZipfExponent, 'f', -1, 64))
+	}
 
-	if b.config.DataSizeMin > 0 && b.config.DataSizeMax > 0 {
+	// Workload - Data settings
+	if b.config.DataSizeList != "" {
+		args = append(args, "--data-size-list", b.config.DataSizeList)
+	} else if b.config.DataSizeMin > 0 && b.config.DataSizeMax > 0 {
 		args = append(args, "--data-size-range", fmt.Sprintf("%d-%d", b.config.DataSizeMin, b.config.DataSizeMax))
+		if b.config.DataPattern != "" {
+			args = append(args, "--data-size-pattern", b.config.DataPattern)
+		}
 	} else if b.config.DataSize > 0 {
 		args = append(args, "-d", strconv.Itoa(b.config.DataSize))
 	}
 
-	if b.config.Expiry > 0 {
-		args = append(args, "--expiry-range", fmt.Sprintf("%d-%d", b.config.Expiry, b.config.Expiry))
+	if b.config.RandomData {
+		args = append(args, "-R")
+	}
+	if b.config.DataOffset > 0 {
+		args = append(args, "--data-offset", strconv.Itoa(b.config.DataOffset))
 	}
 
-	// Execution
+	// Workload - Expiry
+	if b.config.ExpiryMin > 0 || b.config.ExpiryMax > 0 {
+		min := b.config.ExpiryMin
+		max := b.config.ExpiryMax
+		if max == 0 {
+			max = min
+		}
+		if min == 0 {
+			min = max
+		}
+		args = append(args, "--expiry-range", fmt.Sprintf("%d-%d", min, max))
+	}
+
+	// Data import options
+	if b.config.DataImport != "" {
+		args = append(args, "--data-import", b.config.DataImport)
+		if b.config.DataVerify {
+			args = append(args, "--data-verify")
+		}
+		if b.config.VerifyOnly {
+			args = append(args, "--verify-only")
+		}
+		if b.config.GenerateKeys {
+			args = append(args, "--generate-keys")
+		}
+		if b.config.NoExpiry {
+			args = append(args, "--no-expiry")
+		}
+	}
+
+	// Custom commands (when using --command, must use --command-key-pattern instead of --key-pattern)
+	for _, cmd := range b.config.CustomCommands {
+		args = append(args, "--command", cmd.Command)
+		if cmd.Ratio > 0 {
+			args = append(args, "--command-ratio", strconv.Itoa(cmd.Ratio))
+		}
+		// --command-key-pattern is required when using custom commands
+		keyPattern := cmd.KeyPattern
+		if keyPattern == "" {
+			keyPattern = "R" // Default to Random
+		}
+		args = append(args, "--command-key-pattern", keyPattern)
+	}
+
+	// Execution - Parallelism
 	args = append(args, "-t", strconv.Itoa(b.config.Threads))
 	args = append(args, "-c", strconv.Itoa(b.config.Clients))
 
+	// Execution - Duration/Requests
 	if b.config.Requests > 0 {
 		args = append(args, "-n", strconv.FormatInt(b.config.Requests, 10))
 	}
-	if b.config.Duration > 0 {
+	if b.config.Duration > 0 && b.config.Requests == 0 {
 		args = append(args, "--test-time", strconv.Itoa(int(b.config.Duration.Seconds())))
 	}
 
+	// Execution - Pipeline
 	args = append(args, "--pipeline", strconv.Itoa(b.config.Pipeline))
 
+	// Execution - Rate limiting
 	if b.config.RateLimit > 0 {
 		args = append(args, "--rate-limiting", strconv.Itoa(b.config.RateLimit))
 	}
-	if b.config.Randomize {
+
+	// Execution - Iterations
+	if b.config.RunCount > 1 {
+		args = append(args, "-x", strconv.Itoa(b.config.RunCount))
+	}
+
+	// Execution - Reconnect
+	if b.config.ReconnectInterval > 0 {
+		args = append(args, "--reconnect-interval", strconv.Itoa(b.config.ReconnectInterval))
+	}
+
+	// Execution - Multi-key operations
+	if b.config.MultiKeyGet > 0 {
+		args = append(args, "--multi-key-get", strconv.Itoa(b.config.MultiKeyGet))
+	}
+
+	// Execution - Randomization
+	if b.config.DistinctClientSeed {
+		args = append(args, "--distinct-client-seed")
+	}
+	if b.config.RandomizeSeed {
 		args = append(args, "--randomize")
 	}
 
-	// Output
-	if b.config.JSONOutput {
+	// WAIT options (for replication scenarios)
+	if b.config.WaitRatio != "" {
+		args = append(args, "--wait-ratio", b.config.WaitRatio)
+	}
+	if b.config.NumSlavesMin > 0 || b.config.NumSlavesMax > 0 {
+		min := b.config.NumSlavesMin
+		max := b.config.NumSlavesMax
+		if max == 0 {
+			max = min
+		}
+		if min == 0 {
+			min = max
+		}
+		args = append(args, "--num-slaves", fmt.Sprintf("%d-%d", min, max))
+	}
+	if b.config.WaitTimeoutMin > 0 || b.config.WaitTimeoutMax > 0 {
+		min := b.config.WaitTimeoutMin
+		max := b.config.WaitTimeoutMax
+		if max == 0 {
+			max = min
+		}
+		if min == 0 {
+			min = max
+		}
+		args = append(args, "--wait-timeout", fmt.Sprintf("%d-%d", min, max))
+	}
+
+	// Output options
+	if b.config.Debug {
+		args = append(args, "-D")
+	}
+	if b.config.ShowConfig {
+		args = append(args, "--show-config")
+	}
+	if b.config.OutFile != "" {
+		args = append(args, "-o", b.config.OutFile)
+	}
+	if b.config.JSONOutFile != "" {
+		args = append(args, "--json-out-file", b.config.JSONOutFile)
+	} else if b.config.JSONOutput {
 		args = append(args, "--json-out-file", "/dev/stdout")
+	}
+	if b.config.HdrFilePrefix != "" {
+		args = append(args, "--hdr-file-prefix", b.config.HdrFilePrefix)
+	}
+	if b.config.ClientStats != "" {
+		args = append(args, "--client-stats", b.config.ClientStats)
 	}
 	if b.config.HideHistogram {
 		args = append(args, "--hide-histogram")
+	}
+	if len(b.config.PrintPercentiles) > 0 {
+		pcts := make([]string, len(b.config.PrintPercentiles))
+		for i, p := range b.config.PrintPercentiles {
+			pcts[i] = strconv.FormatFloat(p, 'f', -1, 64)
+		}
+		args = append(args, "--print-percentiles", strings.Join(pcts, ","))
+	}
+	if b.config.PrintAllRuns {
+		args = append(args, "--print-all-runs")
 	}
 
 	return args

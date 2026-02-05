@@ -58,15 +58,19 @@ func NewEngineWithConfig(cfg EngineConfig) (*Engine, error) {
 
 // RunConfig holds configuration for a benchmark run.
 type RunConfig struct {
-	WorkloadName string
-	WorkloadFile string
-	TargetURL    string
-	Duration     string
-	Threads      int
-	Clients      int
-	Pipeline     int
-	Name         string
-	Tags         []string
+	WorkloadName   string
+	WorkloadFile   string
+	RunProfileName string // Name of run profile to use
+	TargetURL      string
+	// Legacy overrides - these override run profile settings
+	Duration  string
+	Threads   int
+	Clients   int
+	Pipeline  int
+	Requests  int64
+	RateLimit int
+	Name      string
+	Tags      []string
 }
 
 // ProgressCallback is called with progress updates during execution.
@@ -105,17 +109,20 @@ func (e *Engine) Run(ctx context.Context, cfg *RunConfig, progress ProgressCallb
 		}
 	}
 
-	// Apply overrides from config
-	if cfg.Duration != "" {
+	// Build run profile from configuration
+	runProfile := buildRunProfile(cfg)
+
+	// Apply legacy overrides from config to workload (for backwards compatibility)
+	if cfg.Duration != "" && runProfile.Duration == "" {
 		wl.Duration = cfg.Duration
 	}
-	if cfg.Threads > 0 {
+	if cfg.Threads > 0 && runProfile.Threads == 0 {
 		wl.Threads = cfg.Threads
 	}
-	if cfg.Clients > 0 {
+	if cfg.Clients > 0 && runProfile.Clients == 0 {
 		wl.Clients = cfg.Clients
 	}
-	if cfg.Pipeline > 0 {
+	if cfg.Pipeline > 0 && runProfile.Pipeline == 0 {
 		wl.Pipeline = cfg.Pipeline
 	}
 
@@ -142,6 +149,7 @@ func (e *Engine) Run(ctx context.Context, cfg *RunConfig, progress ProgressCallb
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 		Workload:    wl,
+		RunProfile:  runProfile,
 		Target:      target,
 		Environment: env,
 		Status:      domain.RunStatusRunning,
@@ -159,11 +167,24 @@ func (e *Engine) Run(ctx context.Context, cfg *RunConfig, progress ProgressCallb
 		return run, fmt.Errorf("memtier_benchmark not available: %w", err)
 	}
 
-	// Build memtier config
-	memtierCfg := workloadToMemtierConfig(wl, target)
+	// Build memtier config from workload + run profile
+	memtierCfg := memtier.FromWorkloadAndRunProfile(wl, runProfile)
+	memtierCfg.Host = target.Host
+	memtierCfg.Port = target.Port
+	memtierCfg.Password = target.Password
+	memtierCfg.TLS = target.TLS != nil && target.TLS.Enabled
+	memtierCfg.Cluster = target.Cluster
+
+	// Determine duration for progress message
+	durationStr := runProfile.Duration
+	if runProfile.Requests > 0 {
+		durationStr = fmt.Sprintf("%d requests", runProfile.Requests)
+	} else if durationStr == "" {
+		durationStr = wl.Duration
+	}
 
 	if progress != nil {
-		progress(fmt.Sprintf("Running benchmark (duration: %s)...", wl.Duration))
+		progress(fmt.Sprintf("Running benchmark (duration: %s)...", durationStr))
 	}
 
 	// Execute benchmark
@@ -387,4 +408,144 @@ func workloadToMemtierConfig(wl *domain.Workload, target *domain.Target) *memtie
 	}
 
 	return cfg
+}
+
+// buildRunProfile creates a run profile from config, merging with built-in if specified.
+func buildRunProfile(cfg *RunConfig) *domain.RunProfile {
+	var profile *domain.RunProfile
+
+	// Start with built-in profile if specified
+	if cfg.RunProfileName != "" {
+		profile = getBuiltinRunProfile(cfg.RunProfileName)
+	}
+
+	// If no profile found, use default
+	if profile == nil {
+		profile = domain.DefaultRunProfile()
+	}
+
+	// Apply CLI overrides
+	if cfg.Duration != "" {
+		profile.Duration = cfg.Duration
+	}
+	if cfg.Threads > 0 {
+		profile.Threads = cfg.Threads
+	}
+	if cfg.Clients > 0 {
+		profile.Clients = cfg.Clients
+	}
+	if cfg.Pipeline > 0 {
+		profile.Pipeline = cfg.Pipeline
+	}
+	if cfg.Requests > 0 {
+		profile.Requests = cfg.Requests
+		profile.Duration = "" // Requests override duration
+	}
+	if cfg.RateLimit > 0 {
+		profile.RateLimit = cfg.RateLimit
+	}
+
+	return profile
+}
+
+// getBuiltinRunProfile returns a built-in run profile by name.
+func getBuiltinRunProfile(name string) *domain.RunProfile {
+	profiles := map[string]*domain.RunProfile{
+		"default": {
+			Name:        "default",
+			Description: "Default execution profile - balanced settings",
+			IsBuiltin:   true,
+			Threads:     4,
+			Clients:     50,
+			Duration:    "30s",
+			Pipeline:    1,
+			RunCount:    1,
+			Protocol:    "redis",
+		},
+		"quick-test": {
+			Name:        "quick-test",
+			Description: "Quick test - short duration for validation",
+			IsBuiltin:   true,
+			Threads:     2,
+			Clients:     10,
+			Duration:    "10s",
+			Pipeline:    1,
+			RunCount:    1,
+			Protocol:    "redis",
+		},
+		"high-load": {
+			Name:        "high-load",
+			Description: "High load test - maximum parallelism",
+			IsBuiltin:   true,
+			Threads:     8,
+			Clients:     100,
+			Duration:    "60s",
+			Pipeline:    10,
+			RunCount:    1,
+			Protocol:    "redis",
+		},
+		"low-latency": {
+			Name:        "low-latency",
+			Description: "Low latency measurement - minimal pipelining",
+			IsBuiltin:   true,
+			Threads:     2,
+			Clients:     10,
+			Duration:    "30s",
+			Pipeline:    1,
+			RunCount:    3,
+			Protocol:    "redis",
+		},
+		"throughput": {
+			Name:        "throughput",
+			Description: "Throughput focused - aggressive pipelining",
+			IsBuiltin:   true,
+			Threads:     4,
+			Clients:     100,
+			Duration:    "60s",
+			Pipeline:    20,
+			RunCount:    1,
+			Protocol:    "redis",
+		},
+		"stress": {
+			Name:        "stress",
+			Description: "Stress test - extended duration with high load",
+			IsBuiltin:   true,
+			Threads:     8,
+			Clients:     200,
+			Duration:    "300s",
+			Pipeline:    10,
+			RunCount:    1,
+			Protocol:    "redis",
+		},
+		"rate-limited": {
+			Name:        "rate-limited",
+			Description: "Rate limited - controlled request rate",
+			IsBuiltin:   true,
+			Threads:     4,
+			Clients:     50,
+			Duration:    "30s",
+			Pipeline:    1,
+			RunCount:    1,
+			RateLimit:   10000,
+			Protocol:    "redis",
+		},
+		"request-based": {
+			Name:        "request-based",
+			Description: "Request based - fixed number of requests",
+			IsBuiltin:   true,
+			Threads:     4,
+			Clients:     50,
+			Requests:    100000,
+			Pipeline:    1,
+			RunCount:    1,
+			Protocol:    "redis",
+		},
+	}
+
+	if p, ok := profiles[name]; ok {
+		// Return a copy
+		copy := *p
+		return &copy
+	}
+	return nil
 }

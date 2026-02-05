@@ -214,6 +214,28 @@ func (r *Registry) registerBuiltins() {
 		Duration: "30s",
 		Pipeline: 1,
 	})
+
+	// Huge read workload - 100% GET with 100KB values
+	r.Register(&domain.Workload{
+		Name:        "huge-read",
+		Description: "100% GET workload with 100KB values for bandwidth/throughput testing",
+		Type:        "bandwidth",
+		Operations: []domain.Operation{
+			{Command: "GET", Ratio: 1.0},
+		},
+		KeyPattern: &domain.KeyPattern{
+			Prefix:   "huge:",
+			Pattern:  "random",
+			KeyRange: 10000,
+		},
+		DataSize: &domain.DataSize{
+			Fixed: 102400, // 100KB
+		},
+		Threads:  4,
+		Clients:  20,
+		Duration: "30s",
+		Pipeline: 1,
+	})
 }
 
 // Register adds a workload to the registry.

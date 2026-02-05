@@ -342,9 +342,9 @@ type AMRClusterProps struct {
 
 // AMRDatabase represents a database within an AMR cluster.
 type AMRDatabase struct {
-	ID         string           `json:"id"`
-	Name       string           `json:"name"`
-	Type       string           `json:"type"`
+	ID         string            `json:"id"`
+	Name       string            `json:"name"`
+	Type       string            `json:"type"`
 	Properties *AMRDatabaseProps `json:"properties"`
 }
 

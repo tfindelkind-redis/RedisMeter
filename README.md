@@ -32,6 +32,11 @@ A scalable Redis performance benchmarking and baseline tool built on memtier_ben
 - **Audit Logging** - Track all operations
 - **Storage Backends** - PostgreSQL, SQLite, or in-memory
 
+### Operational Features
+- **Structured Logging** - Comprehensive logging with filtering and export
+- **Infrastructure Profiles** - Save and reuse cloud infrastructure configurations
+- **Data Bundles** - Export/import all data for backup and migration
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -187,6 +192,34 @@ duration: "60s"
 | GET | `/api/v1/compare` | Compare run vs baseline |
 | GET | `/api/v1/analyze` | Run performance analysis |
 
+### Logs
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/logs` | Query logs with filters |
+| DELETE | `/api/v1/logs` | Delete logs matching filter |
+| GET | `/api/v1/logs/stats` | Get log statistics |
+| GET | `/api/v1/logs/export` | Export logs in JSON/CSV format |
+
+### Infrastructure Profiles
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/infra-profiles` | List all profiles |
+| POST | `/api/v1/infra-profiles` | Create new profile |
+| GET | `/api/v1/infra-profiles/:id` | Get profile details |
+| PUT | `/api/v1/infra-profiles/:id` | Update profile |
+| DELETE | `/api/v1/infra-profiles/:id` | Delete profile |
+| GET | `/api/v1/infra-profiles/stats` | Get profile statistics |
+
+### Bundle Export/Import
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/bundle/export` | Export data bundle |
+| POST | `/api/v1/bundle/import` | Import data bundle |
+| POST | `/api/v1/bundle/info` | Get bundle metadata |
+
 ## 🧪 CI/CD Integration
 
 ```yaml
@@ -200,6 +233,73 @@ duration: "60s"
       --fail-on-regression 10
 ```
 
+## 🔧 CLI Commands
+
+### Logging Commands
+
+```bash
+# List recent logs
+redismeter logs list --limit 50
+
+# Show specific log entry
+redismeter logs show <log-id>
+
+# Export logs to file
+redismeter logs export --output logs.json --format json
+
+# Clear old logs
+redismeter logs clear --before 2024-01-01
+
+# View log statistics
+redismeter logs stats
+```
+
+### Infrastructure Profile Commands
+
+```bash
+# List all profiles
+redismeter profiles list
+
+# Show profile details
+redismeter profiles show my-aws-profile
+
+# Create a new profile
+redismeter profiles create --name prod-aws --provider aws \
+  --region us-east-1 --instance-type r6g.xlarge
+
+# Delete a profile
+redismeter profiles delete my-old-profile
+
+# Export profiles
+redismeter profiles export --output profiles.json
+
+# Import profiles
+redismeter profiles import --file profiles.json
+
+# View profile statistics
+redismeter profiles stats
+```
+
+### Bundle Export/Import Commands
+
+```bash
+# Export all data to a bundle
+redismeter bundle export --output backup.tar.gz
+
+# Export with specific data types
+redismeter bundle export --output partial.tar.gz \
+  --include-runs --include-baselines --exclude-logs
+
+# Import a bundle
+redismeter bundle import --file backup.tar.gz
+
+# Import with merge strategy (don't overwrite existing)
+redismeter bundle import --file backup.tar.gz --merge
+
+# View bundle information without importing
+redismeter bundle info --file backup.tar.gz
+```
+
 ## 📁 Project Structure
 
 ```
@@ -207,11 +307,35 @@ redismeter/
 ├── cmd/                    # CLI commands
 ├── internal/
 │   ├── api/               # REST API server
-│   ├── benchmark/         # Benchmark execution
-│   ├── domain/            # Domain models
-│   ├── storage/           # Storage backends
+│   ├── alerting/          # Alert system
 │   ├── analysis/          # Performance analyzers
-│   └── enterprise/        # Enterprise features
+│   ├── auth/              # Authentication (OIDC, API keys)
+│   ├── bundle/            # Export/import bundles
+│   ├── cicd/              # CI/CD integration
+│   ├── cli/               # CLI command handlers
+│   ├── cloud/             # Cloud providers (AWS, etc.)
+│   ├── cluster/           # Redis Cluster support
+│   ├── domain/            # Domain models
+│   ├── engine/            # Benchmark engine
+│   ├── environment/       # Environment capture
+│   ├── export/            # Data export
+│   ├── importer/          # Data import
+│   ├── infraprofile/      # Infrastructure profiles
+│   ├── logging/           # Structured logging
+│   ├── memtier/           # memtier_benchmark integration
+│   ├── observability/     # Metrics and tracing
+│   ├── org/               # Organization/team management
+│   ├── plugin/            # Plugin system
+│   ├── reporter/          # Report generation
+│   ├── storage/           # Storage backends
+│   ├── terraform/         # Terraform integration
+│   ├── workload/          # Workload registry
+│   └── workloads/         # Built-in workload modules
+├── pkg/
+│   └── pluginkit/         # Plugin development kit
+├── sdk/
+│   ├── go/                # Go SDK
+│   └── python/            # Python SDK
 ├── web/                   # React Web UI
 │   ├── src/
 │   │   ├── pages/        # Page components

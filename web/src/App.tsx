@@ -12,6 +12,9 @@ import Analytics from '@/pages/Analytics';
 import InfrastructureList from '@/pages/InfrastructureList';
 import InfrastructureNew from '@/pages/InfrastructureNew';
 import InfrastructureDetail from '@/pages/InfrastructureDetail';
+import InfraProfiles from '@/pages/InfraProfiles';
+import Workloads from '@/pages/Workloads';
+import RunProfiles from '@/pages/RunProfiles';
 import { useGlobalWebSocket } from '@/hooks/useWebSocket';
 import { useEffect } from 'react';
 import { useStore } from '@/store';
@@ -48,6 +51,9 @@ function App() {
             <Route path="/infrastructure" element={<InfrastructureList />} />
             <Route path="/infrastructure/new" element={<InfrastructureNew />} />
             <Route path="/infrastructure/:id" element={<InfrastructureDetail />} />
+            <Route path="/infra-profiles" element={<InfraProfiles />} />
+            <Route path="/workloads" element={<Workloads />} />
+            <Route path="/run-profiles" element={<RunProfiles />} />
           </Routes>
         </Content>
       </Layout>

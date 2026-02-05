@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
   Card,
   Form,
@@ -28,10 +28,27 @@ import {
   CheckCircleOutlined,
   LoadingOutlined,
   CloudOutlined,
+  DownOutlined,
+  RightOutlined,
 } from '@ant-design/icons';
 import api from '@/api/client';
 import { Workload, BenchmarkConfig, Infrastructure } from '@/types';
 import useWebSocket from '@/hooks/useWebSocket';
+
+// Define RunProfile type locally until types are consolidated
+interface RunProfile {
+  name: string;
+  description?: string;
+  threads: number;
+  clients: number;
+  duration?: string;
+  requests?: number;
+  pipeline: number;
+  rate_limit?: number;
+  protocol?: string;
+  run_count?: number;
+  is_builtin?: boolean;
+}
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -45,9 +62,11 @@ interface FormValues {
   tls: boolean;
   cluster: boolean;
   workload: string;
-  threads: number;
-  clients: number;
-  duration: string;
+  run_profile: string;
+  // Override settings (optional, for when custom overrides are needed)
+  threads?: number;
+  clients?: number;
+  duration?: string;
   requests?: number;
   tags?: string;
 }
@@ -57,11 +76,17 @@ export default function NewBenchmark() {
   const [searchParams] = useSearchParams();
   const [form] = Form.useForm();
   const [workloads, setWorkloads] = useState<Workload[]>([]);
+  const [runProfiles, setRunProfiles] = useState<RunProfile[]>([]);
   const [loading, setLoading] = useState(false);
   const [running, setRunning] = useState(false);
   const [runId, setRunId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
+  const [showOverrides, setShowOverrides] = useState(false);
+  
+  // Watch form values for reactive display
+  const selectedWorkloadName = Form.useWatch('workload', form);
+  const selectedRunProfileName = Form.useWatch('run_profile', form);
   
   // Cloud infrastructure mode
   const infraId = searchParams.get('infra');
@@ -74,6 +99,7 @@ export default function NewBenchmark() {
 
   useEffect(() => {
     loadWorkloads();
+    loadRunProfiles();
     if (infraId) {
       loadInfrastructure(infraId);
     }
@@ -103,6 +129,15 @@ export default function NewBenchmark() {
       setWorkloads(data);
     } catch (error) {
       console.error('Failed to load workloads');
+    }
+  };
+
+  const loadRunProfiles = async () => {
+    try {
+      const data = await api.getRunProfilesFull();
+      setRunProfiles(data);
+    } catch (error) {
+      console.error('Failed to load run profiles');
     }
   };
 
@@ -140,6 +175,7 @@ export default function NewBenchmark() {
         const result = await api.runCloudBenchmark({
           infrastructure_id: infrastructure.id,
           workload: values.workload,
+          run_profile: values.run_profile,
           threads: values.threads,
           clients: values.clients,
           requests: values.requests || 100000,
@@ -163,9 +199,11 @@ export default function NewBenchmark() {
             cluster: values.cluster,
           },
           workload: values.workload,
-          threads: values.threads,
-          clients: values.clients,
-          duration: values.duration,
+          run_profile: values.run_profile,
+          // Optional overrides
+          threads: showOverrides ? values.threads : undefined,
+          clients: showOverrides ? values.clients : undefined,
+          duration: showOverrides ? values.duration : undefined,
           tags: values.tags?.split(',').map(t => t.trim()).filter(Boolean),
         };
 
@@ -216,7 +254,8 @@ export default function NewBenchmark() {
     poll();
   };
 
-  const selectedWorkload = workloads.find(w => w.name === form.getFieldValue('workload'));
+  const selectedWorkload = workloads.find(w => w.name === selectedWorkloadName);
+  const selectedRunProfile = runProfiles.find(p => p.name === selectedRunProfileName);
 
   // Show loading spinner while loading infrastructure
   if (infraLoading) {
@@ -314,9 +353,7 @@ export default function NewBenchmark() {
             port: 6379,
             tls: false,
             cluster: false,
-            threads: 4,
-            clients: 50,
-            duration: '30s',
+            run_profile: 'default',
             requests: 100000,
           }}
         >
@@ -440,46 +477,98 @@ export default function NewBenchmark() {
             {/* Performance Settings */}
             <Col xs={24} lg={12}>
               <Card 
-                title="Performance Settings" 
+                title="Run Profile" 
+                extra={<Link to="/run-profiles"><SettingOutlined /> Manage</Link>}
                 style={{ background: '#ffffff', border: '1px solid #d9d9d9', marginBottom: 24 }}
               >
                 <Form.Item
-                  name="threads"
-                  label="Threads"
-                  rules={[{ required: true }]}
-                  extra="Number of worker threads per runner"
+                  name="run_profile"
+                  label="Run Profile"
+                  rules={[{ required: true, message: 'Please select a run profile' }]}
+                  extra="Controls execution settings: threads, clients, duration, pipeline"
                 >
-                  <InputNumber min={1} max={64} style={{ width: '100%' }} />
+                  <Select placeholder="Select run profile">
+                    {runProfiles.map((p) => (
+                      <Option key={p.name} value={p.name}>
+                        {p.name} {p.is_builtin && <Tag>builtin</Tag>}
+                      </Option>
+                    ))}
+                  </Select>
                 </Form.Item>
 
-                <Form.Item
-                  name="clients"
-                  label="Clients"
-                  rules={[{ required: true }]}
-                  extra="Number of concurrent connections per runner"
-                >
-                  <InputNumber min={1} max={1000} style={{ width: '100%' }} />
-                </Form.Item>
-
-                {isCloudMode ? (
-                  <Form.Item
-                    name="requests"
-                    label="Requests"
-                    rules={[{ required: true }]}
-                    extra="Total number of requests per runner"
-                  >
-                    <InputNumber min={1000} style={{ width: '100%' }} />
-                  </Form.Item>
-                ) : (
-                  <Form.Item
-                    name="duration"
-                    label="Duration"
-                    rules={[{ required: true }]}
-                    extra="e.g., 30s, 5m, 1h"
-                  >
-                    <Input placeholder="30s" />
-                  </Form.Item>
+                {selectedRunProfile && (
+                  <div style={{ marginTop: 8, padding: 12, background: '#f5f5f5', borderRadius: 6 }}>
+                    <Row gutter={16}>
+                      <Col span={12}>
+                        <Text type="secondary">Threads:</Text> <Text strong>{selectedRunProfile.threads}</Text>
+                      </Col>
+                      <Col span={12}>
+                        <Text type="secondary">Clients:</Text> <Text strong>{selectedRunProfile.clients}</Text>
+                      </Col>
+                    </Row>
+                    <Row gutter={16} style={{ marginTop: 8 }}>
+                      <Col span={12}>
+                        {selectedRunProfile.duration ? (
+                          <><Text type="secondary">Duration:</Text> <Text strong>{selectedRunProfile.duration}</Text></>
+                        ) : (
+                          <><Text type="secondary">Requests:</Text> <Text strong>{selectedRunProfile.requests?.toLocaleString()}</Text></>
+                        )}
+                      </Col>
+                      <Col span={12}>
+                        <Text type="secondary">Pipeline:</Text> <Text strong>{selectedRunProfile.pipeline}</Text>
+                      </Col>
+                    </Row>
+                    {selectedRunProfile.description && (
+                      <div style={{ marginTop: 8, borderTop: '1px solid #e8e8e8', paddingTop: 8 }}>
+                        <Text type="secondary" style={{ fontSize: 12 }}>{selectedRunProfile.description}</Text>
+                      </div>
+                    )}
+                  </div>
                 )}
+
+                {/* Override Settings (Collapsible) */}
+                <div style={{ marginTop: 16 }}>
+                  <Button 
+                    type="link" 
+                    onClick={() => setShowOverrides(!showOverrides)}
+                    style={{ padding: 0 }}
+                    icon={showOverrides ? <DownOutlined /> : <RightOutlined />}
+                  >
+                    {showOverrides ? 'Hide' : 'Show'} Override Settings
+                  </Button>
+                  
+                  {showOverrides && (
+                    <div style={{ marginTop: 12, padding: 12, background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 6 }}>
+                      <Alert 
+                        message="Override run profile settings for this benchmark only" 
+                        type="warning" 
+                        showIcon 
+                        style={{ marginBottom: 12 }}
+                      />
+                      <Row gutter={16}>
+                        <Col span={12}>
+                          <Form.Item name="threads" label="Threads" style={{ marginBottom: 8 }}>
+                            <InputNumber min={1} max={64} style={{ width: '100%' }} placeholder="Use profile" />
+                          </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                          <Form.Item name="clients" label="Clients" style={{ marginBottom: 8 }}>
+                            <InputNumber min={1} max={1000} style={{ width: '100%' }} placeholder="Use profile" />
+                          </Form.Item>
+                        </Col>
+                      </Row>
+                      {isCloudMode ? (
+                        <Form.Item name="requests" label="Requests" style={{ marginBottom: 0 }}>
+                          <InputNumber min={1000} style={{ width: '100%' }} placeholder="Use profile" />
+                        </Form.Item>
+                      ) : (
+                        <Form.Item name="duration" label="Duration" style={{ marginBottom: 0 }}>
+                          <Input placeholder="Use profile (e.g., 30s, 5m)" />
+                        </Form.Item>
+                      )}
+                    </div>
+                  )}
+                </div>
               </Card>
             </Col>
           </Row>

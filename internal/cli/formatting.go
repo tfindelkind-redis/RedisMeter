@@ -18,17 +18,17 @@ import (
 
 // Spinner provides an animated spinner with status updates.
 type Spinner struct {
-	mu         sync.Mutex
-	frames     []string
-	frameIdx   int
-	message    string
-	resource   string
-	elapsed    string
-	total      int
-	completed  int
-	active     bool
-	stopCh     chan struct{}
-	doneCh     chan struct{}
+	mu        sync.Mutex
+	frames    []string
+	frameIdx  int
+	message   string
+	resource  string
+	elapsed   string
+	total     int
+	completed int
+	active    bool
+	stopCh    chan struct{}
+	doneCh    chan struct{}
 }
 
 // NewSpinner creates a new spinner.

@@ -90,6 +90,122 @@ class ApiClient {
     return response.data?.workloads || [];
   }
 
+  async getWorkloadsFull(): Promise<any[]> {
+    const response = await this.client.get('/workloads?full=true');
+    return response.data?.workloads || [];
+  }
+
+  async getWorkload(name: string): Promise<any> {
+    const response = await this.client.get(`/workloads/${name}`);
+    return response.data;
+  }
+
+  async createWorkload(workload: any): Promise<any> {
+    const response = await this.client.post('/workloads', workload);
+    return response.data;
+  }
+
+  async updateWorkload(name: string, workload: any): Promise<any> {
+    const response = await this.client.put(`/workloads/${name}`, workload);
+    return response.data;
+  }
+
+  async deleteWorkload(name: string): Promise<void> {
+    await this.client.delete(`/workloads/${name}`);
+  }
+
+  // Run Profiles
+  async getRunProfiles(): Promise<any[]> {
+    const response = await this.client.get('/run-profiles');
+    return response.data?.run_profiles || [];
+  }
+
+  async getRunProfilesFull(): Promise<any[]> {
+    const response = await this.client.get('/run-profiles?full=true');
+    return response.data?.run_profiles || [];
+  }
+
+  async getRunProfile(name: string): Promise<any> {
+    const response = await this.client.get(`/run-profiles/${name}`);
+    return response.data;
+  }
+
+  async createRunProfile(profile: any): Promise<any> {
+    const response = await this.client.post('/run-profiles', profile);
+    return response.data;
+  }
+
+  async updateRunProfile(name: string, profile: any): Promise<any> {
+    const response = await this.client.put(`/run-profiles/${name}`, profile);
+    return response.data;
+  }
+
+  async deleteRunProfile(name: string): Promise<void> {
+    await this.client.delete(`/run-profiles/${name}`);
+  }
+
+  // Infrastructure Profiles
+  async getInfraProfiles(params?: {
+    provider?: string;
+    tag?: string;
+  }): Promise<{ profiles: any[]; count: number }> {
+    const response = await this.client.get('/infrastructure-profiles', { params });
+    return {
+      profiles: response.data?.profiles || [],
+      count: response.data?.count || 0,
+    };
+  }
+
+  async getInfraProfile(id: string): Promise<any> {
+    const response = await this.client.get(`/infrastructure-profiles/${id}`);
+    return response.data;
+  }
+
+  async createInfraProfile(profile: any): Promise<any> {
+    const response = await this.client.post('/infrastructure-profiles', profile);
+    return response.data;
+  }
+
+  async updateInfraProfile(id: string, profile: any): Promise<any> {
+    const response = await this.client.put(`/infrastructure-profiles/${id}`, profile);
+    return response.data;
+  }
+
+  async deleteInfraProfile(id: string): Promise<void> {
+    await this.client.delete(`/infrastructure-profiles/${id}`);
+  }
+
+  async getInfraProfileStats(): Promise<{
+    total_profiles: number;
+    by_provider: Record<string, number>;
+    most_used?: any;
+    recently_created?: any;
+    recently_used?: any;
+  }> {
+    const response = await this.client.get('/infrastructure-profiles/stats');
+    return response.data;
+  }
+
+  async exportInfraProfiles(): Promise<Blob> {
+    const response = await this.client.get('/infrastructure-profiles/export', {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
+  async importInfraProfiles(file: File, overwrite: boolean = false): Promise<{
+    imported: number;
+    message: string;
+  }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('overwrite', String(overwrite));
+    const response = await this.client.post('/infrastructure-profiles/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  }
+
   // Benchmark execution
   async startBenchmark(config: {
     name?: string;
@@ -216,6 +332,7 @@ class ApiClient {
   async runCloudBenchmark(config: {
     infrastructure_id: string;
     workload?: string;
+    run_profile?: string;
     requests?: number;
     clients?: number;
     threads?: number;

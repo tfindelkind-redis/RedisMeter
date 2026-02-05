@@ -41,6 +41,12 @@ type Server struct {
 
 	// Static file serving
 	webDir string // Directory containing built frontend
+
+	// Extended features (set via Register* methods)
+	logStore          LogStore          // Log storage
+	infraProfileStore InfraProfileStore // Infrastructure profile storage
+	bundleProvider    BundleDataProvider // Export/import data provider
+	bundleVersion     string            // Application version for bundle manifest
 }
 
 // ActiveInfraOp tracks an active infrastructure operation.
@@ -129,6 +135,9 @@ func (s *Server) setupRoutes(cfg ServerConfig) {
 	s.mux.HandleFunc("/api/v1/baselines", s.handleBaselines)
 	s.mux.HandleFunc("/api/v1/baselines/", s.handleBaseline)
 	s.mux.HandleFunc("/api/v1/workloads", s.handleWorkloads)
+	s.mux.HandleFunc("/api/v1/workloads/", s.handleWorkload)
+	s.mux.HandleFunc("/api/v1/run-profiles", s.handleRunProfiles)
+	s.mux.HandleFunc("/api/v1/run-profiles/", s.handleRunProfile)
 	s.mux.HandleFunc("/api/v1/benchmark", s.handleBenchmark)
 	s.mux.HandleFunc("/api/v1/benchmark/", s.handleBenchmarkStatus)
 	s.mux.HandleFunc("/api/v1/compare", s.handleCompare)
@@ -437,37 +446,517 @@ func (s *Server) deleteBaseline(w http.ResponseWriter, r *http.Request, id strin
 }
 
 func (s *Server) handleWorkloads(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
+	switch r.Method {
+	case http.MethodGet:
+		s.listWorkloads(w, r)
+	case http.MethodPost:
+		s.createWorkload(w, r)
+	default:
 		methodNotAllowed(w)
+	}
+}
+
+func (s *Server) listWorkloads(w http.ResponseWriter, r *http.Request) {
+	full := r.URL.Query().Get("full") == "true"
+
+	// Get built-in workloads from registry
+	builtinWorkloads := []map[string]interface{}{
+		{"name": "cache", "description": "Standard cache workload with GET/SET operations", "is_builtin": true,
+			"operations": []map[string]interface{}{{"command": "GET", "ratio": 0.8}, {"command": "SET", "ratio": 0.2}},
+			"threads": 4, "clients": 50, "duration": "30s", "pipeline": 1,
+			"key_pattern": map[string]interface{}{"prefix": "cache:", "pattern": "random", "key_range": 1000000},
+			"data_size": map[string]interface{}{"fixed": 256}},
+		{"name": "mixed", "description": "Mixed workload with various operation types", "is_builtin": true,
+			"operations": []map[string]interface{}{{"command": "GET", "ratio": 0.5}, {"command": "SET", "ratio": 0.5}},
+			"threads": 4, "clients": 50, "duration": "30s", "pipeline": 1,
+			"key_pattern": map[string]interface{}{"prefix": "mixed:", "pattern": "random", "key_range": 500000},
+			"data_size": map[string]interface{}{"min": 64, "max": 1024}},
+		{"name": "read-heavy", "description": "Read-heavy workload (90% GET, 10% SET)", "is_builtin": true,
+			"operations": []map[string]interface{}{{"command": "GET", "ratio": 0.9}, {"command": "SET", "ratio": 0.1}},
+			"threads": 4, "clients": 50, "duration": "30s", "pipeline": 1,
+			"key_pattern": map[string]interface{}{"prefix": "read:", "pattern": "random", "key_range": 1000000},
+			"data_size": map[string]interface{}{"fixed": 256}},
+		{"name": "write-heavy", "description": "Write-heavy workload (10% GET, 90% SET)", "is_builtin": true,
+			"operations": []map[string]interface{}{{"command": "GET", "ratio": 0.1}, {"command": "SET", "ratio": 0.9}},
+			"threads": 4, "clients": 50, "duration": "30s", "pipeline": 1,
+			"key_pattern": map[string]interface{}{"prefix": "write:", "pattern": "random", "key_range": 1000000},
+			"data_size": map[string]interface{}{"fixed": 256}},
+		{"name": "pipeline", "description": "Pipeline workload for bulk operations", "is_builtin": true,
+			"operations": []map[string]interface{}{{"command": "GET", "ratio": 0.8}, {"command": "SET", "ratio": 0.2}},
+			"threads": 4, "clients": 100, "duration": "30s", "pipeline": 10,
+			"key_pattern": map[string]interface{}{"prefix": "pipe:", "pattern": "random", "key_range": 1000000},
+			"data_size": map[string]interface{}{"fixed": 100}},
+		{"name": "large-values", "description": "Large value workload (1KB-10KB)", "is_builtin": true,
+			"operations": []map[string]interface{}{{"command": "GET", "ratio": 0.5}, {"command": "SET", "ratio": 0.5}},
+			"threads": 4, "clients": 20, "duration": "30s", "pipeline": 1,
+			"key_pattern": map[string]interface{}{"prefix": "large:", "pattern": "random", "key_range": 10000},
+			"data_size": map[string]interface{}{"min": 1024, "max": 10240}},
+		{"name": "small-values", "description": "Small value workload (8-64 bytes)", "is_builtin": true,
+			"operations": []map[string]interface{}{{"command": "GET", "ratio": 0.8}, {"command": "SET", "ratio": 0.2}},
+			"threads": 4, "clients": 50, "duration": "30s", "pipeline": 1,
+			"key_pattern": map[string]interface{}{"prefix": "small:", "pattern": "random", "key_range": 1000000},
+			"data_size": map[string]interface{}{"min": 8, "max": 64}},
+		{"name": "scan-heavy", "description": "SCAN operation heavy workload", "is_builtin": true,
+			"operations": []map[string]interface{}{{"command": "SCAN", "ratio": 0.7}, {"command": "GET", "ratio": 0.3}},
+			"threads": 2, "clients": 10, "duration": "30s", "pipeline": 1,
+			"key_pattern": map[string]interface{}{"prefix": "scan:", "pattern": "random", "key_range": 100000},
+			"data_size": map[string]interface{}{"fixed": 256}},
+		{"name": "huge-read", "description": "100% GET workload with 100KB values", "is_builtin": true,
+			"operations": []map[string]interface{}{{"command": "GET", "ratio": 1.0}},
+			"threads": 4, "clients": 20, "duration": "30s", "pipeline": 1,
+			"key_pattern": map[string]interface{}{"prefix": "huge:", "pattern": "random", "key_range": 10000},
+			"data_size": map[string]interface{}{"fixed": 102400}},
+	}
+
+	// Get custom workloads from storage
+	customWorkloads := s.getCustomWorkloads()
+
+	// Combine workloads
+	allWorkloads := append(builtinWorkloads, customWorkloads...)
+
+	if !full {
+		// Return simplified list for backward compatibility
+		simplified := make([]map[string]string, len(allWorkloads))
+		for i, w := range allWorkloads {
+			simplified[i] = map[string]string{
+				"name":        w["name"].(string),
+				"description": w["description"].(string),
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]interface{}{"workloads": simplified})
 		return
 	}
 
-	// Return built-in workloads
-	// This would need to be wired to the workload registry
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"workloads": []map[string]string{
-			{"name": "cache", "description": "Standard cache workload with GET/SET operations"},
-			{"name": "mixed", "description": "Mixed workload with various operation types"},
-			{"name": "read-heavy", "description": "Read-heavy workload (90% GET, 10% SET)"},
-			{"name": "write-heavy", "description": "Write-heavy workload (10% GET, 90% SET)"},
-			{"name": "pipeline", "description": "Pipeline workload for bulk operations"},
-			{"name": "large-values", "description": "Large value workload (1KB-10KB)"},
-			{"name": "small-values", "description": "Small value workload (8-64 bytes)"},
-			{"name": "scan-heavy", "description": "SCAN operation heavy workload"},
+	writeJSON(w, http.StatusOK, map[string]interface{}{"workloads": allWorkloads})
+}
+
+func (s *Server) getCustomWorkloads() []map[string]interface{} {
+	// Load custom workloads from file
+	workloadsFile := filepath.Join(os.Getenv("HOME"), ".redismeter", "custom_workloads.json")
+	data, err := os.ReadFile(workloadsFile)
+	if err != nil {
+		return []map[string]interface{}{}
+	}
+
+	var workloads []map[string]interface{}
+	if err := json.Unmarshal(data, &workloads); err != nil {
+		log.Printf("Failed to parse custom workloads: %v", err)
+		return []map[string]interface{}{}
+	}
+
+	return workloads
+}
+
+func (s *Server) saveCustomWorkloads(workloads []map[string]interface{}) error {
+	workloadsFile := filepath.Join(os.Getenv("HOME"), ".redismeter", "custom_workloads.json")
+
+	// Ensure directory exists
+	if err := os.MkdirAll(filepath.Dir(workloadsFile), 0755); err != nil {
+		return err
+	}
+
+	data, err := json.MarshalIndent(workloads, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(workloadsFile, data, 0644)
+}
+
+func (s *Server) createWorkload(w http.ResponseWriter, r *http.Request) {
+	var workload map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&workload); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid JSON: "+err.Error())
+		return
+	}
+
+	name, ok := workload["name"].(string)
+	if !ok || name == "" {
+		writeError(w, http.StatusBadRequest, "name is required")
+		return
+	}
+
+	// Check if name conflicts with built-in
+	builtinNames := []string{"cache", "mixed", "read-heavy", "write-heavy", "pipeline", "large-values", "small-values", "scan-heavy", "huge-read"}
+	for _, bn := range builtinNames {
+		if name == bn {
+			writeError(w, http.StatusConflict, "Cannot use built-in workload name")
+			return
+		}
+	}
+
+	workload["is_builtin"] = false
+
+	customWorkloads := s.getCustomWorkloads()
+
+	// Check for duplicate
+	for _, cw := range customWorkloads {
+		if cw["name"] == name {
+			writeError(w, http.StatusConflict, "Workload already exists")
+			return
+		}
+	}
+
+	customWorkloads = append(customWorkloads, workload)
+
+	if err := s.saveCustomWorkloads(customWorkloads); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to save workload: "+err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, workload)
+}
+
+func (s *Server) handleWorkload(w http.ResponseWriter, r *http.Request) {
+	// Extract workload name from path: /api/v1/workloads/{name}
+	path := strings.TrimPrefix(r.URL.Path, "/api/v1/workloads/")
+	name := strings.TrimSuffix(path, "/")
+
+	if name == "" {
+		writeError(w, http.StatusBadRequest, "workload name required")
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		s.getWorkload(w, r, name)
+	case http.MethodPut:
+		s.updateWorkload(w, r, name)
+	case http.MethodDelete:
+		s.deleteWorkload(w, r, name)
+	default:
+		methodNotAllowed(w)
+	}
+}
+
+func (s *Server) getWorkload(w http.ResponseWriter, r *http.Request, name string) {
+	customWorkloads := s.getCustomWorkloads()
+
+	for _, cw := range customWorkloads {
+		if cw["name"] == name {
+			writeJSON(w, http.StatusOK, cw)
+			return
+		}
+	}
+
+	writeError(w, http.StatusNotFound, "Workload not found")
+}
+
+func (s *Server) updateWorkload(w http.ResponseWriter, r *http.Request, name string) {
+	var workload map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&workload); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid JSON: "+err.Error())
+		return
+	}
+
+	customWorkloads := s.getCustomWorkloads()
+
+	found := false
+	for i, cw := range customWorkloads {
+		if cw["name"] == name {
+			workload["name"] = name // Preserve name
+			workload["is_builtin"] = false
+			customWorkloads[i] = workload
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		writeError(w, http.StatusNotFound, "Workload not found")
+		return
+	}
+
+	if err := s.saveCustomWorkloads(customWorkloads); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to save workload: "+err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, workload)
+}
+
+func (s *Server) deleteWorkload(w http.ResponseWriter, r *http.Request, name string) {
+	customWorkloads := s.getCustomWorkloads()
+
+	found := false
+	newWorkloads := make([]map[string]interface{}, 0)
+	for _, cw := range customWorkloads {
+		if cw["name"] == name {
+			found = true
+			continue
+		}
+		newWorkloads = append(newWorkloads, cw)
+	}
+
+	if !found {
+		writeError(w, http.StatusNotFound, "Workload not found")
+		return
+	}
+
+	if err := s.saveCustomWorkloads(newWorkloads); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to save workloads: "+err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted", "name": name})
+}
+
+// ===================== Run Profile Handlers =====================
+
+func (s *Server) handleRunProfiles(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		s.listRunProfiles(w, r)
+	case http.MethodPost:
+		s.createRunProfile(w, r)
+	default:
+		methodNotAllowed(w)
+	}
+}
+
+func (s *Server) listRunProfiles(w http.ResponseWriter, r *http.Request) {
+	full := r.URL.Query().Get("full") == "true"
+
+	// Built-in run profiles
+	builtinProfiles := []map[string]interface{}{
+		{
+			"name": "default", "description": "Default execution profile - balanced settings",
+			"is_builtin": true, "threads": 4, "clients": 50, "duration": "30s", "pipeline": 1,
+			"run_count": 1, "protocol": "redis",
 		},
-	})
+		{
+			"name": "quick-test", "description": "Quick test - short duration for validation",
+			"is_builtin": true, "threads": 2, "clients": 10, "duration": "10s", "pipeline": 1,
+			"run_count": 1, "protocol": "redis",
+		},
+		{
+			"name": "high-load", "description": "High load test - maximum parallelism",
+			"is_builtin": true, "threads": 8, "clients": 100, "duration": "60s", "pipeline": 10,
+			"run_count": 1, "protocol": "redis",
+		},
+		{
+			"name": "low-latency", "description": "Low latency measurement - minimal pipelining",
+			"is_builtin": true, "threads": 2, "clients": 10, "duration": "30s", "pipeline": 1,
+			"run_count": 3, "protocol": "redis",
+		},
+		{
+			"name": "throughput", "description": "Throughput focused - aggressive pipelining",
+			"is_builtin": true, "threads": 4, "clients": 100, "duration": "60s", "pipeline": 20,
+			"run_count": 1, "protocol": "redis",
+		},
+		{
+			"name": "stress", "description": "Stress test - extended duration with high load",
+			"is_builtin": true, "threads": 8, "clients": 200, "duration": "300s", "pipeline": 10,
+			"run_count": 1, "protocol": "redis",
+		},
+		{
+			"name": "rate-limited", "description": "Rate limited - controlled request rate",
+			"is_builtin": true, "threads": 4, "clients": 50, "duration": "30s", "pipeline": 1,
+			"run_count": 1, "rate_limit": 10000, "protocol": "redis",
+		},
+		{
+			"name": "request-based", "description": "Request based - fixed number of requests",
+			"is_builtin": true, "threads": 4, "clients": 50, "requests": 100000, "pipeline": 1,
+			"run_count": 1, "protocol": "redis",
+		},
+	}
+
+	// Get custom run profiles
+	customProfiles := s.getCustomRunProfiles()
+	allProfiles := append(builtinProfiles, customProfiles...)
+
+	if !full {
+		simplified := make([]map[string]string, len(allProfiles))
+		for i, p := range allProfiles {
+			simplified[i] = map[string]string{
+				"name":        p["name"].(string),
+				"description": p["description"].(string),
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]interface{}{"run_profiles": simplified})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{"run_profiles": allProfiles})
+}
+
+func (s *Server) getCustomRunProfiles() []map[string]interface{} {
+	profilesFile := filepath.Join(os.Getenv("HOME"), ".redismeter", "custom_run_profiles.json")
+	data, err := os.ReadFile(profilesFile)
+	if err != nil {
+		return []map[string]interface{}{}
+	}
+
+	var profiles []map[string]interface{}
+	if err := json.Unmarshal(data, &profiles); err != nil {
+		log.Printf("Failed to parse custom run profiles: %v", err)
+		return []map[string]interface{}{}
+	}
+
+	return profiles
+}
+
+func (s *Server) saveCustomRunProfiles(profiles []map[string]interface{}) error {
+	profilesFile := filepath.Join(os.Getenv("HOME"), ".redismeter", "custom_run_profiles.json")
+
+	if err := os.MkdirAll(filepath.Dir(profilesFile), 0755); err != nil {
+		return err
+	}
+
+	data, err := json.MarshalIndent(profiles, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(profilesFile, data, 0644)
+}
+
+func (s *Server) createRunProfile(w http.ResponseWriter, r *http.Request) {
+	var profile map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&profile); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid JSON: "+err.Error())
+		return
+	}
+
+	name, ok := profile["name"].(string)
+	if !ok || name == "" {
+		writeError(w, http.StatusBadRequest, "name is required")
+		return
+	}
+
+	builtinNames := []string{"default", "quick-test", "high-load", "low-latency", "throughput", "stress", "rate-limited", "request-based"}
+	for _, bn := range builtinNames {
+		if name == bn {
+			writeError(w, http.StatusConflict, "Cannot use built-in run profile name")
+			return
+		}
+	}
+
+	profile["is_builtin"] = false
+	customProfiles := s.getCustomRunProfiles()
+
+	for _, cp := range customProfiles {
+		if cp["name"] == name {
+			writeError(w, http.StatusConflict, "Run profile already exists")
+			return
+		}
+	}
+
+	customProfiles = append(customProfiles, profile)
+
+	if err := s.saveCustomRunProfiles(customProfiles); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to save run profile: "+err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, profile)
+}
+
+func (s *Server) handleRunProfile(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/v1/run-profiles/")
+	name := strings.TrimSuffix(path, "/")
+
+	if name == "" {
+		writeError(w, http.StatusBadRequest, "run profile name required")
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		s.getRunProfile(w, r, name)
+	case http.MethodPut:
+		s.updateRunProfile(w, r, name)
+	case http.MethodDelete:
+		s.deleteRunProfile(w, r, name)
+	default:
+		methodNotAllowed(w)
+	}
+}
+
+func (s *Server) getRunProfile(w http.ResponseWriter, r *http.Request, name string) {
+	customProfiles := s.getCustomRunProfiles()
+
+	for _, cp := range customProfiles {
+		if cp["name"] == name {
+			writeJSON(w, http.StatusOK, cp)
+			return
+		}
+	}
+
+	writeError(w, http.StatusNotFound, "Run profile not found")
+}
+
+func (s *Server) updateRunProfile(w http.ResponseWriter, r *http.Request, name string) {
+	var profile map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&profile); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid JSON: "+err.Error())
+		return
+	}
+
+	customProfiles := s.getCustomRunProfiles()
+
+	found := false
+	for i, cp := range customProfiles {
+		if cp["name"] == name {
+			profile["name"] = name
+			profile["is_builtin"] = false
+			customProfiles[i] = profile
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		writeError(w, http.StatusNotFound, "Run profile not found")
+		return
+	}
+
+	if err := s.saveCustomRunProfiles(customProfiles); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to save run profile: "+err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, profile)
+}
+
+func (s *Server) deleteRunProfile(w http.ResponseWriter, r *http.Request, name string) {
+	customProfiles := s.getCustomRunProfiles()
+
+	found := false
+	newProfiles := make([]map[string]interface{}, 0)
+	for _, cp := range customProfiles {
+		if cp["name"] == name {
+			found = true
+			continue
+		}
+		newProfiles = append(newProfiles, cp)
+	}
+
+	if !found {
+		writeError(w, http.StatusNotFound, "Run profile not found")
+		return
+	}
+
+	if err := s.saveCustomRunProfiles(newProfiles); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to save run profiles: "+err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted", "name": name})
 }
 
 // BenchmarkConfig represents a benchmark configuration.
 type BenchmarkConfig struct {
-	Workload string `json:"workload"`
-	Target   string `json:"target"`
-	Password string `json:"password,omitempty"`
-	Duration string `json:"duration,omitempty"`
-	Requests int    `json:"requests,omitempty"`
-	Clients  int    `json:"clients,omitempty"`
-	Threads  int    `json:"threads,omitempty"`
-	Pipeline int    `json:"pipeline,omitempty"`
+	Workload   string   `json:"workload"`
+	RunProfile string   `json:"run_profile,omitempty"` // Optional run profile name
+	Target     string   `json:"target"`
+	Password   string   `json:"password,omitempty"`
+	// Legacy fields - kept for backwards compatibility, overridden by run profile if specified
+	Duration string   `json:"duration,omitempty"`
+	Requests int      `json:"requests,omitempty"`
+	Clients  int      `json:"clients,omitempty"`
+	Threads  int      `json:"threads,omitempty"`
+	Pipeline int      `json:"pipeline,omitempty"`
 	Tags     []string `json:"tags,omitempty"`
 }
 
@@ -513,9 +1002,9 @@ func (s *Server) handleBenchmark(w http.ResponseWriter, r *http.Request) {
 	go s.runBenchmark(ctx, benchID, &cfg)
 
 	writeJSON(w, http.StatusAccepted, map[string]interface{}{
-		"id":       benchID,
-		"status":   "starting",
-		"message":  "Benchmark started",
+		"id":         benchID,
+		"status":     "starting",
+		"message":    "Benchmark started",
 		"status_url": fmt.Sprintf("/api/v1/benchmark/%s", benchID),
 	})
 }
@@ -726,7 +1215,7 @@ func getSummary(run *domain.BenchmarkRun) *domain.SummaryMetrics {
 
 func analyzeRun(run *domain.BenchmarkRun, analyzers []string) map[string]interface{} {
 	summary := getSummary(run)
-	
+
 	analysisResult := map[string]interface{}{
 		"run_id": run.ID,
 		"summary": map[string]interface{}{
@@ -836,13 +1325,13 @@ func contains(slice []string, item string) bool {
 
 // InfraCreateRequest is the request body for creating infrastructure.
 type InfraCreateRequest struct {
-	Name     string                 `json:"name"`
-	Provider string                 `json:"provider"`
-	Region   string                 `json:"region"`
-	TTL      string                 `json:"ttl,omitempty"`
-	Tags     map[string]string      `json:"tags,omitempty"`
-	AMR      *InfraAMRConfig        `json:"amr,omitempty"`
-	Runners  *InfraRunnerConfig     `json:"runners,omitempty"`
+	Name     string             `json:"name"`
+	Provider string             `json:"provider"`
+	Region   string             `json:"region"`
+	TTL      string             `json:"ttl,omitempty"`
+	Tags     map[string]string  `json:"tags,omitempty"`
+	AMR      *InfraAMRConfig    `json:"amr,omitempty"`
+	Runners  *InfraRunnerConfig `json:"runners,omitempty"`
 }
 
 // InfraAMRConfig is the AMR configuration for infrastructure.
@@ -856,25 +1345,25 @@ type InfraAMRConfig struct {
 
 // InfraRunnerConfig is the runner configuration for infrastructure.
 type InfraRunnerConfig struct {
-	Count        int    `json:"count"`
-	InstanceType string `json:"instance_type"`
+	Count         int    `json:"count"`
+	InstanceType  string `json:"instance_type"`
 	SpotInstances bool   `json:"spot_instances"`
-	SSHPublicKey string `json:"ssh_public_key"`
-	SSHUser      string `json:"ssh_user"`
+	SSHPublicKey  string `json:"ssh_public_key"`
+	SSHUser       string `json:"ssh_user"`
 }
 
 // InfraResponse is the response for infrastructure operations.
 type InfraResponse struct {
-	ID        string            `json:"id"`
-	Name      string            `json:"name"`
-	Status    string            `json:"status"`
-	Provider  string            `json:"provider"`
-	Region    string            `json:"region"`
-	CreatedAt time.Time         `json:"created_at"`
-	UpdatedAt time.Time         `json:"updated_at"`
-	ExpiresAt *time.Time        `json:"expires_at,omitempty"`
-	Outputs   *InfraOutputs     `json:"outputs,omitempty"`
-	Error     string            `json:"error,omitempty"`
+	ID        string              `json:"id"`
+	Name      string              `json:"name"`
+	Status    string              `json:"status"`
+	Provider  string              `json:"provider"`
+	Region    string              `json:"region"`
+	CreatedAt time.Time           `json:"created_at"`
+	UpdatedAt time.Time           `json:"updated_at"`
+	ExpiresAt *time.Time          `json:"expires_at,omitempty"`
+	Outputs   *InfraOutputs       `json:"outputs,omitempty"`
+	Error     string              `json:"error,omitempty"`
 	Config    *InfraCreateRequest `json:"config,omitempty"`
 }
 
@@ -922,7 +1411,7 @@ func (s *Server) listInfrastructures(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"infrastructures": responses,
-		"count":          len(responses),
+		"count":           len(responses),
 	})
 }
 
@@ -991,11 +1480,11 @@ func (s *Server) createInfrastructure(w http.ResponseWriter, r *http.Request) {
 		}
 
 		config.Runners = &terraform.RunnerConfig{
-			Count:        req.Runners.Count,
-			InstanceType: req.Runners.InstanceType,
+			Count:         req.Runners.Count,
+			InstanceType:  req.Runners.InstanceType,
 			SpotInstances: req.Runners.SpotInstances,
-			SSHPublicKey: sshKey,
-			SSHUser:      req.Runners.SSHUser,
+			SSHPublicKey:  sshKey,
+			SSHUser:       req.Runners.SSHUser,
 		}
 		if config.Runners.SSHUser == "" {
 			config.Runners.SSHUser = "azureuser"
@@ -1007,7 +1496,7 @@ func (s *Server) createInfrastructure(w http.ResponseWriter, r *http.Request) {
 
 	// Start provisioning in background
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	// Track the operation
 	op := &ActiveInfraOp{
 		ID:        fmt.Sprintf("pending-%d", time.Now().Unix()),
@@ -1383,11 +1872,11 @@ func (s *Server) runCloudBenchmark(ctx context.Context, benchmarkID string, stat
 		Results:   aggregatedResults,
 		Tags:      []string{"cloud", state.Provider, state.Region},
 		Labels: map[string]string{
-			"cloud":           "true",
-			"provider":        state.Provider,
-			"region":          state.Region,
-			"infrastructure":  state.ID,
-			"runner_count":    fmt.Sprintf("%d", len(runnerIPs)),
+			"cloud":          "true",
+			"provider":       state.Provider,
+			"region":         state.Region,
+			"infrastructure": state.ID,
+			"runner_count":   fmt.Sprintf("%d", len(runnerIPs)),
 		},
 	}
 
@@ -1528,8 +2017,8 @@ func parseAndAggregateCloudResults(jsonDataList [][]byte) (*domain.Results, erro
 					Latency   float64 `json:"Latency"`
 				} `json:"Gets"`
 				Totals struct {
-					OpsPerSec    float64 `json:"Ops/sec"`
-					Latency      float64 `json:"Latency"`
+					OpsPerSec   float64 `json:"Ops/sec"`
+					Latency     float64 `json:"Latency"`
 					Percentiles struct {
 						P50  float64 `json:"p50.00"`
 						P90  float64 `json:"p90.00"`
@@ -1668,8 +2157,8 @@ func infraStateToResponse(state *terraform.InfraState) InfraResponse {
 	}
 	if state.Config.Runners != nil {
 		resp.Config.Runners = &InfraRunnerConfig{
-			Count:        state.Config.Runners.Count,
-			InstanceType: state.Config.Runners.InstanceType,
+			Count:         state.Config.Runners.Count,
+			InstanceType:  state.Config.Runners.InstanceType,
 			SpotInstances: state.Config.Runners.SpotInstances,
 		}
 	}

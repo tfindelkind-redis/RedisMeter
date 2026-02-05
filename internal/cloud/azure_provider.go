@@ -37,15 +37,15 @@ type AzureConfig struct {
 // ExecutionPolicy defines retry and tolerance settings for robust execution.
 type ExecutionPolicy struct {
 	// Provisioning
-	ProvisionTimeout    time.Duration // Max time to wait for VM provisioning (default: 10m)
-	ProvisionRetries    int           // Number of retry attempts per VM (default: 2)
-	ParallelProvision   bool          // Provision VMs in parallel (default: true)
+	ProvisionTimeout  time.Duration // Max time to wait for VM provisioning (default: 10m)
+	ProvisionRetries  int           // Number of retry attempts per VM (default: 2)
+	ParallelProvision bool          // Provision VMs in parallel (default: true)
 
 	// SSH & Configuration
-	SSHConnectTimeout   time.Duration // Timeout for SSH connection (default: 30s)
-	SSHRetries          int           // SSH connection retry attempts (default: 5)
-	SSHRetryDelay       time.Duration // Delay between SSH retries (default: 10s)
-	ConfigureTimeout    time.Duration // Timeout for memtier installation (default: 5m)
+	SSHConnectTimeout time.Duration // Timeout for SSH connection (default: 30s)
+	SSHRetries        int           // SSH connection retry attempts (default: 5)
+	SSHRetryDelay     time.Duration // Delay between SSH retries (default: 10s)
+	ConfigureTimeout  time.Duration // Timeout for memtier installation (default: 5m)
 
 	// Execution
 	ExecutionTimeout    time.Duration // Max benchmark duration (default: 1h)
@@ -53,12 +53,12 @@ type ExecutionPolicy struct {
 	HeartbeatTimeout    time.Duration // Max time without heartbeat (default: 30s)
 
 	// Failure tolerance
-	FailureTolerance    int           // Max VMs that can fail (default: 0 = none)
-	ContinueOnPartial   bool          // Continue if some VMs fail to provision
+	FailureTolerance  int  // Max VMs that can fail (default: 0 = none)
+	ContinueOnPartial bool // Continue if some VMs fail to provision
 
 	// Synchronization
-	SyncWindow          time.Duration // Time window for synchronized start (default: 2s)
-	PreStartDelay       time.Duration // Delay before starting after sync (default: 5s)
+	SyncWindow    time.Duration // Time window for synchronized start (default: 2s)
+	PreStartDelay time.Duration // Delay before starting after sync (default: 5s)
 }
 
 // DefaultExecutionPolicy returns sensible defaults for Azure deployments.
@@ -87,9 +87,9 @@ func DefaultExecutionPolicy() ExecutionPolicy {
 
 // AzureVMSize represents an Azure VM size with specifications.
 type AzureVMSize struct {
-	Name        string  `json:"name"`         // e.g., Standard_D4s_v3
-	Family      string  `json:"family"`       // e.g., Dsv3
-	Category    string  `json:"category"`     // cost-optimized, balanced, high-performance
+	Name        string  `json:"name"`     // e.g., Standard_D4s_v3
+	Family      string  `json:"family"`   // e.g., Dsv3
+	Category    string  `json:"category"` // cost-optimized, balanced, high-performance
 	VCPUs       int     `json:"vcpus"`
 	MemoryGB    int     `json:"memory_gb"`
 	NetworkGbps float64 `json:"network_gbps"` // Expected network bandwidth
@@ -343,53 +343,53 @@ type AzureDeployment struct {
 	Location      string
 
 	// VM tracking
-	VMs          []*AzureVM
-	mu           sync.RWMutex
+	VMs []*AzureVM
+	mu  sync.RWMutex
 
 	// Progress tracking
-	StartTime    time.Time
-	EndTime      time.Time
-	
+	StartTime time.Time
+	EndTime   time.Time
+
 	// Events for monitoring
-	Events       []DeploymentEvent
-	eventsMu     sync.Mutex
+	Events   []DeploymentEvent
+	eventsMu sync.Mutex
 
 	// Cancellation
-	cancel       context.CancelFunc
-	done         chan struct{}
+	cancel context.CancelFunc
+	done   chan struct{}
 
 	// Error tracking
-	Errors       []error
+	Errors []error
 }
 
 // AzureVM tracks an individual runner VM.
 type AzureVM struct {
-	ID            string
-	Name          string
-	State         VMState
-	
+	ID    string
+	Name  string
+	State VMState
+
 	// Network
-	PublicIP      string
-	PrivateIP     string
-	NICId         string
-	
+	PublicIP  string
+	PrivateIP string
+	NICId     string
+
 	// SSH
-	SSHReady      bool
-	SSHClient     interface{} // *ssh.Client when connected
-	
+	SSHReady  bool
+	SSHClient interface{} // *ssh.Client when connected
+
 	// Health monitoring
 	LastHeartbeat time.Time
 	FailureCount  int
-	
+
 	// Execution
-	ExecutionID   string
-	StartTime     time.Time
-	EndTime       time.Time
-	
+	ExecutionID string
+	StartTime   time.Time
+	EndTime     time.Time
+
 	// Results
-	Output        string
-	RawJSON       []byte
-	Error         error
+	Output  string
+	RawJSON []byte
+	Error   error
 }
 
 // DeploymentEvent records significant events during deployment.
@@ -407,24 +407,24 @@ type DeploymentEvent struct {
 
 // AzureProvider implements the ProviderPlugin interface for Azure.
 type AzureProvider struct {
-	config       AzureConfig
-	credential   *azidentity.DefaultAzureCredential
+	config     AzureConfig
+	credential *azidentity.DefaultAzureCredential
 
 	// Azure clients
-	rgClient      *armresources.ResourceGroupsClient
-	vmClient      *armcompute.VirtualMachinesClient
-	nicClient     *armnetwork.InterfacesClient
-	pipClient     *armnetwork.PublicIPAddressesClient
-	vnetClient    *armnetwork.VirtualNetworksClient
-	subnetClient  *armnetwork.SubnetsClient
-	nsgClient     *armnetwork.SecurityGroupsClient
+	rgClient     *armresources.ResourceGroupsClient
+	vmClient     *armcompute.VirtualMachinesClient
+	nicClient    *armnetwork.InterfacesClient
+	pipClient    *armnetwork.PublicIPAddressesClient
+	vnetClient   *armnetwork.VirtualNetworksClient
+	subnetClient *armnetwork.SubnetsClient
+	nsgClient    *armnetwork.SecurityGroupsClient
 
 	// Active deployments
-	deployments   map[string]*AzureDeployment
-	mu            sync.RWMutex
+	deployments map[string]*AzureDeployment
+	mu          sync.RWMutex
 
 	// SSH executor for remote commands
-	sshExecutor   *SSHExecutor
+	sshExecutor *SSHExecutor
 }
 
 // NewAzureProvider creates a new Azure provider instance.
@@ -577,7 +577,7 @@ func (p *AzureProvider) Name() string {
 // Provision creates cloud infrastructure for benchmark execution.
 func (p *AzureProvider) Provision(ctx context.Context, spec *InfraSpec) (*Infrastructure, error) {
 	deployID := fmt.Sprintf("rm-%s", uuid.New().String()[:8])
-	
+
 	// Create deployment tracking
 	deployment := &AzureDeployment{
 		ID:            deployID,
@@ -609,14 +609,14 @@ func (p *AzureProvider) Provision(ctx context.Context, spec *InfraSpec) (*Infras
 	for _, vm := range deployment.VMs {
 		if vm.State == VMStateReady {
 			loadGenerators = append(loadGenerators, Instance{
-				ID:        vm.ID,
-				Name:      vm.Name,
-				Type:      spec.LoadGenerator.InstanceType,
-				State:     InstanceStateRunning,
-				PublicIP:  vm.PublicIP,
-				PrivateIP: vm.PrivateIP,
+				ID:         vm.ID,
+				Name:       vm.Name,
+				Type:       spec.LoadGenerator.InstanceType,
+				State:      InstanceStateRunning,
+				PublicIP:   vm.PublicIP,
+				PrivateIP:  vm.PrivateIP,
 				LaunchTime: deployment.StartTime,
-				Role:      "load_generator",
+				Role:       "load_generator",
 			})
 		}
 	}
@@ -678,7 +678,7 @@ func (p *AzureProvider) runProvisioning(ctx context.Context, d *AzureDeployment)
 
 	minRequired := d.Spec.LoadGenerator.Count - p.config.Policy.FailureTolerance
 	if readyCount < minRequired {
-		return fmt.Errorf("only %d of %d VMs ready (minimum %d required)", 
+		return fmt.Errorf("only %d of %d VMs ready (minimum %d required)",
 			readyCount, d.Spec.LoadGenerator.Count, minRequired)
 	}
 
@@ -697,9 +697,9 @@ func (p *AzureProvider) createResourceGroup(ctx context.Context, d *AzureDeploym
 	_, err := p.rgClient.CreateOrUpdate(ctx, d.ResourceGroup, armresources.ResourceGroup{
 		Location: to.Ptr(d.Location),
 		Tags: map[string]*string{
-			"managed-by":  to.Ptr("redismeter"),
-			"deployment":  to.Ptr(d.ID),
-			"created-at":  to.Ptr(time.Now().Format(time.RFC3339)),
+			"managed-by": to.Ptr("redismeter"),
+			"deployment": to.Ptr(d.ID),
+			"created-at": to.Ptr(time.Now().Format(time.RFC3339)),
 		},
 	}, nil)
 
@@ -789,7 +789,7 @@ func (p *AzureProvider) createNetworkInfra(ctx context.Context, d *AzureDeployme
 
 func (p *AzureProvider) provisionVMs(ctx context.Context, d *AzureDeployment, subnetID string) error {
 	count := d.Spec.LoadGenerator.Count
-	
+
 	// Create VM tracking objects
 	for i := 0; i < count; i++ {
 		vm := &AzureVM{
@@ -835,7 +835,7 @@ func (p *AzureProvider) provisionVMsParallel(ctx context.Context, d *AzureDeploy
 	minRequired := d.Spec.LoadGenerator.Count - p.config.Policy.FailureTolerance
 
 	if successCount < minRequired {
-		return fmt.Errorf("insufficient VMs provisioned: %d succeeded, %d required (errors: %v)", 
+		return fmt.Errorf("insufficient VMs provisioned: %d succeeded, %d required (errors: %v)",
 			successCount, minRequired, errors)
 	}
 
@@ -850,7 +850,7 @@ func (p *AzureProvider) provisionVMsSequential(ctx context.Context, d *AzureDepl
 	for _, vm := range d.VMs {
 		if err := p.provisionSingleVM(ctx, d, vm, subnetID); err != nil {
 			d.addEvent(vm.Name, "fail", "VM provisioning failed", err)
-			
+
 			if !p.config.Policy.ContinueOnPartial {
 				return err
 			}
@@ -916,7 +916,7 @@ func (p *AzureProvider) provisionSingleVM(ctx context.Context, d *AzureDeploymen
 
 	// Create VM with cloud-init
 	cloudInit := p.generateCloudInit()
-	
+
 	vmPoller, err := p.vmClient.BeginCreateOrUpdate(ctx, d.ResourceGroup, vm.Name,
 		armcompute.VirtualMachine{
 			Location: to.Ptr(d.Location),
@@ -1042,17 +1042,17 @@ echo "memtier_benchmark installation complete" > /tmp/memtier_ready
 
 func (p *AzureProvider) configureVMs(ctx context.Context, d *AzureDeployment) error {
 	var wg sync.WaitGroup
-	
+
 	fmt.Printf("   🔧 Configuring %d VMs...\n", len(d.VMs))
-	
+
 	for _, vm := range d.VMs {
 		if vm.State == VMStateFailed {
 			fmt.Printf("   ⚠️  Skipping failed VM: %s\n", vm.Name)
 			continue // Skip failed VMs
 		}
-		
+
 		fmt.Printf("   📡 VM %s: State=%v, PublicIP=%s\n", vm.Name, vm.State, vm.PublicIP)
-		
+
 		wg.Add(1)
 		go func(vm *AzureVM) {
 			defer wg.Done()
@@ -1076,9 +1076,9 @@ func (p *AzureProvider) configureVM(ctx context.Context, d *AzureDeployment, vm 
 	defer cancel()
 
 	fmt.Printf("      [%s] Starting SSH configuration (timeout: %v)\n", vm.Name, p.config.Policy.ConfigureTimeout)
-	fmt.Printf("      [%s] SSH Config: User=%s, PrivateKeyPath=%s, Port=%d\n", 
+	fmt.Printf("      [%s] SSH Config: User=%s, PrivateKeyPath=%s, Port=%d\n",
 		vm.Name, p.sshExecutor.config.User, p.sshExecutor.config.PrivateKeyPath, p.sshExecutor.config.Port)
-	
+
 	d.addEvent(vm.Name, "configure", "Waiting for SSH availability", nil)
 
 	// Wait for SSH with exponential backoff
@@ -1093,7 +1093,7 @@ func (p *AzureProvider) configureVM(ctx context.Context, d *AzureDeployment, vm 
 				delay = 60 * time.Second
 			}
 			d.addEvent(vm.Name, "configure", fmt.Sprintf("SSH not ready, retrying in %v (attempt %d/%d)", delay, attempt+1, p.config.Policy.SSHRetries), nil)
-			
+
 			select {
 			case <-ctx.Done():
 				fmt.Printf("      [%s] Context cancelled during SSH wait\n", vm.Name)
@@ -1106,7 +1106,7 @@ func (p *AzureProvider) configureVM(ctx context.Context, d *AzureDeployment, vm 
 		sshErr = nil
 		break
 	}
-	
+
 	if sshErr != nil {
 		return fmt.Errorf("SSH connection failed after %d attempts: %w", p.config.Policy.SSHRetries, sshErr)
 	}
@@ -1117,7 +1117,7 @@ func (p *AzureProvider) configureVM(ctx context.Context, d *AzureDeployment, vm 
 	// Wait for memtier installation (cloud-init)
 	fmt.Printf("      [%s] Waiting for memtier_benchmark installation...\n", vm.Name)
 	d.addEvent(vm.Name, "configure", "Waiting for memtier_benchmark installation", nil)
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -1134,7 +1134,7 @@ func (p *AzureProvider) configureVM(ctx context.Context, d *AzureDeployment, vm 
 		if err != nil {
 			fmt.Printf("      [%s] Error checking memtier_ready: %v\n", vm.Name, err)
 		}
-		
+
 		time.Sleep(5 * time.Second)
 	}
 
@@ -1161,7 +1161,7 @@ func (p *AzureProvider) ExecuteBenchmark(ctx context.Context, deployID string, w
 	p.mu.RLock()
 	d, ok := p.deployments[deployID]
 	p.mu.RUnlock()
-	
+
 	if !ok {
 		return fmt.Errorf("deployment not found: %s", deployID)
 	}
@@ -1198,7 +1198,7 @@ func (p *AzureProvider) ExecuteBenchmark(ctx context.Context, deployID string, w
 		wg.Add(1)
 		go func(vm *AzureVM) {
 			defer wg.Done()
-			
+
 			// Create a script that waits until the synchronized start time
 			// then runs memtier_benchmark
 			cmd := fmt.Sprintf(`
@@ -1314,7 +1314,7 @@ func (p *AzureProvider) monitorExecution(ctx context.Context, d *AzureDeployment
 					// Benchmark completed, collect results
 					vm.State = VMStateCompleted
 					vm.EndTime = time.Now()
-					
+
 					results, _ := p.sshExecutor.RunCommand(ctx, vm.PublicIP, "cat /tmp/results.json")
 					vm.RawJSON = []byte(results)
 					d.addEvent(vm.Name, "complete", "Benchmark completed", nil)
@@ -1362,7 +1362,7 @@ func (p *AzureProvider) Teardown(ctx context.Context, infra *Infrastructure) err
 
 	// Delete resource group (deletes all resources)
 	err := p.deleteResourceGroup(ctx, d.ResourceGroup)
-	
+
 	if err == nil {
 		d.EndTime = time.Now()
 		d.addEvent("", "cleanup", "Infrastructure teardown complete", nil)
@@ -1391,7 +1391,7 @@ func (p *AzureProvider) deleteResourceGroup(ctx context.Context, rgName string) 
 func (d *AzureDeployment) addEvent(vm, eventType, message string, err error) {
 	d.eventsMu.Lock()
 	defer d.eventsMu.Unlock()
-	
+
 	d.Events = append(d.Events, DeploymentEvent{
 		Time:    time.Now(),
 		VM:      vm,
@@ -1404,15 +1404,15 @@ func (d *AzureDeployment) addEvent(vm, eventType, message string, err error) {
 func azureRegionFromSpec(region string) string {
 	// Map common region names to Azure locations
 	regionMap := map[string]string{
-		"us-east-1":    "eastus",
-		"us-east-2":    "eastus2",
-		"us-west-1":    "westus",
-		"us-west-2":    "westus2",
-		"eu-west-1":    "westeurope",
-		"eu-central-1": "germanywestcentral",
+		"us-east-1":      "eastus",
+		"us-east-2":      "eastus2",
+		"us-west-1":      "westus",
+		"us-west-2":      "westus2",
+		"eu-west-1":      "westeurope",
+		"eu-central-1":   "germanywestcentral",
 		"ap-southeast-1": "southeastasia",
 	}
-	
+
 	if mapped, ok := regionMap[region]; ok {
 		return mapped
 	}
@@ -1427,25 +1427,25 @@ func buildMemtierArgs(workload interface{}, target interface{}) string {
 	// Build memtier_benchmark arguments from workload and target
 	w, wOk := workload.(*domain.Workload)
 	t, tOk := target.(*domain.Target)
-	
+
 	if !wOk || !tOk {
 		return "--server localhost --port 6379"
 	}
-	
+
 	args := fmt.Sprintf("--server %s --port %d", t.Host, t.Port)
-	
+
 	if t.Password != "" {
 		args += fmt.Sprintf(" --authenticate %s", t.Password)
 	}
-	
+
 	if t.TLS != nil && t.TLS.Enabled {
 		args += " --tls"
 	}
-	
+
 	if t.Cluster {
 		args += " --cluster-mode"
 	}
-	
+
 	// Workload settings
 	if w.Threads > 0 {
 		args += fmt.Sprintf(" --threads %d", w.Threads)
@@ -1459,7 +1459,7 @@ func buildMemtierArgs(workload interface{}, target interface{}) string {
 	if w.Pipeline > 0 {
 		args += fmt.Sprintf(" --pipeline %d", w.Pipeline)
 	}
-	
+
 	// Build ratio from operations if available
 	if len(w.Operations) >= 2 {
 		// Find SET and GET ratios
@@ -1479,7 +1479,7 @@ func buildMemtierArgs(workload interface{}, target interface{}) string {
 			args += fmt.Sprintf(" --ratio %d:%d", setInt, getInt)
 		}
 	}
-	
+
 	// Data size
 	if w.DataSize != nil {
 		if w.DataSize.Fixed > 0 {
@@ -1488,7 +1488,7 @@ func buildMemtierArgs(workload interface{}, target interface{}) string {
 			args += fmt.Sprintf(" --data-size-range %d-%d", w.DataSize.Min, w.DataSize.Max)
 		}
 	}
-	
+
 	// Key pattern
 	if w.KeyPattern != nil {
 		if w.KeyPattern.Prefix != "" {
@@ -1498,7 +1498,7 @@ func buildMemtierArgs(workload interface{}, target interface{}) string {
 			args += fmt.Sprintf(" --key-maximum %d", w.KeyPattern.KeyRange)
 		}
 	}
-	
+
 	return args
 }
 
@@ -1596,7 +1596,7 @@ func (p *AzureProvider) ListInstanceTypes(ctx context.Context, region string) ([
 func (p *AzureProvider) EstimateCost(ctx context.Context, spec *InfraSpec, duration time.Duration) (*CostEstimate, error) {
 	// Simplified cost estimation
 	// Real implementation would use Azure Pricing API
-	
+
 	hourlyRates := map[string]float64{
 		"Standard_D2s_v3":  0.096,
 		"Standard_D4s_v3":  0.192,
@@ -1617,7 +1617,7 @@ func (p *AzureProvider) EstimateCost(ctx context.Context, spec *InfraSpec, durat
 	}
 
 	vmCost := rate * float64(spec.LoadGenerator.Count) * hours
-	
+
 	// Spot discount (~70%)
 	if spec.LoadGenerator.SpotInstances {
 		vmCost *= 0.3

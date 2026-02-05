@@ -221,7 +221,7 @@ func getCloudProvider(ctx context.Context, provider string) (cloud.ProviderPlugi
 		if subID == "" {
 			return nil, fmt.Errorf("Azure subscription ID not found. Set AZURE_SUBSCRIPTION_ID or run 'az login'")
 		}
-		
+
 		// Get SSH public key
 		sshPubKey := viper.GetString("azure.ssh_public_key")
 		if sshPubKey == "" {
@@ -235,20 +235,20 @@ func getCloudProvider(ctx context.Context, provider string) (cloud.ProviderPlugi
 		if sshPubKey == "" {
 			return nil, fmt.Errorf("SSH public key not found. Set azure.ssh_public_key in config or create ~/.ssh/id_rsa.pub")
 		}
-		
+
 		// Get SSH private key path
 		sshPrivKey := viper.GetString("ssh.private_key_path")
 		if sshPrivKey == "" {
 			homeDir, _ := os.UserHomeDir()
 			sshPrivKey = homeDir + "/.ssh/id_rsa"
 		}
-		
+
 		// Get SSH user with default
 		sshUser := viper.GetString("ssh.user")
 		if sshUser == "" {
 			sshUser = "azureuser"
 		}
-		
+
 		azConfig := cloud.AzureConfig{
 			SubscriptionID: subID,
 			SSHPublicKey:   sshPubKey,

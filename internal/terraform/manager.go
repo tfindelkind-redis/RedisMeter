@@ -44,47 +44,47 @@ type Manager struct {
 
 // InfraConfig defines the infrastructure configuration.
 type InfraConfig struct {
-	Name     string            `json:"name"`               // Name is a unique identifier for this infrastructure
-	Provider string            `json:"provider"`           // Provider is the cloud provider (azure, aws, gcp)
-	Region   string            `json:"region"`             // Region is the deployment region
-	AMR      *AMRConfig        `json:"amr,omitempty"`      // AMR (Azure Managed Redis) Configuration
-	Runners  *RunnerConfig     `json:"runners,omitempty"`  // Runner VM Configuration
-	Tags     map[string]string `json:"tags,omitempty"`     // Tags to apply to all resources
-	TTL      time.Duration     `json:"ttl,omitempty"`      // TTL is the maximum lifetime (0 = no auto-cleanup)
+	Name     string            `json:"name"`              // Name is a unique identifier for this infrastructure
+	Provider string            `json:"provider"`          // Provider is the cloud provider (azure, aws, gcp)
+	Region   string            `json:"region"`            // Region is the deployment region
+	AMR      *AMRConfig        `json:"amr,omitempty"`     // AMR (Azure Managed Redis) Configuration
+	Runners  *RunnerConfig     `json:"runners,omitempty"` // Runner VM Configuration
+	Tags     map[string]string `json:"tags,omitempty"`    // Tags to apply to all resources
+	TTL      time.Duration     `json:"ttl,omitempty"`     // TTL is the maximum lifetime (0 = no auto-cleanup)
 }
 
 // AMRConfig defines Azure Managed Redis configuration.
 type AMRConfig struct {
-	SKU              string   `json:"sku"`                          // SKU is the AMR SKU (Balanced_B0, Balanced_B1, etc.)
-	Modules          []string `json:"modules,omitempty"`            // Modules are Redis modules to enable (RedisJSON, RediSearch, etc.)
-	HighAvailability bool     `json:"high_availability"`            // HighAvailability enables HA mode
-	ClusteringPolicy string   `json:"clustering_policy"`            // ClusteringPolicy: OSSCluster, EnterpriseCluster, or NoCluster
-	EvictionPolicy   string   `json:"eviction_policy"`              // EvictionPolicy for the database
+	SKU              string   `json:"sku"`               // SKU is the AMR SKU (Balanced_B0, Balanced_B1, etc.)
+	Modules          []string `json:"modules,omitempty"` // Modules are Redis modules to enable (RedisJSON, RediSearch, etc.)
+	HighAvailability bool     `json:"high_availability"` // HighAvailability enables HA mode
+	ClusteringPolicy string   `json:"clustering_policy"` // ClusteringPolicy: OSSCluster, EnterpriseCluster, or NoCluster
+	EvictionPolicy   string   `json:"eviction_policy"`   // EvictionPolicy for the database
 }
 
 // RunnerConfig defines benchmark runner VM configuration.
 type RunnerConfig struct {
-	Count        int    `json:"count"`          // Count is the number of runner VMs
-	InstanceType string `json:"instance_type"`  // InstanceType is the VM size (e.g., Standard_D4s_v3)
+	Count         int    `json:"count"`          // Count is the number of runner VMs
+	InstanceType  string `json:"instance_type"`  // InstanceType is the VM size (e.g., Standard_D4s_v3)
 	SpotInstances bool   `json:"spot_instances"` // SpotInstances enables spot/preemptible VMs
-	SSHPublicKey string `json:"ssh_public_key"` // SSHPublicKey for VM access
-	SSHUser      string `json:"ssh_user"`       // SSHUser for VM access (default: azureuser)
+	SSHPublicKey  string `json:"ssh_public_key"` // SSHPublicKey for VM access
+	SSHUser       string `json:"ssh_user"`       // SSHUser for VM access (default: azureuser)
 }
 
 // InfraState represents the current state of infrastructure.
 type InfraState struct {
-	ID            string        `json:"id"`                    // ID is the unique infrastructure identifier
-	Name          string        `json:"name"`                  // Name is the human-readable name
-	Status        string        `json:"status"`                // Status: pending, provisioning, ready, destroying, destroyed, failed
-	Provider      string        `json:"provider"`              // Provider (azure, aws, gcp)
-	Region        string        `json:"region"`                // Region
-	CreatedAt     time.Time     `json:"created_at"`            // CreatedAt timestamp
-	UpdatedAt     time.Time     `json:"updated_at"`            // UpdatedAt timestamp
-	ExpiresAt     time.Time     `json:"expires_at,omitempty"`  // ExpiresAt for TTL-based cleanup (zero = no expiry)
-	Config        InfraConfig   `json:"config"`                // Config used to create this infrastructure
-	Outputs       *InfraOutputs `json:"outputs,omitempty"`     // Outputs from Terraform
-	WorkspacePath string        `json:"workspace_path"`        // WorkspacePath is the path to the Terraform workspace
-	Error         string        `json:"error,omitempty"`       // Error message if status is failed
+	ID            string        `json:"id"`                   // ID is the unique infrastructure identifier
+	Name          string        `json:"name"`                 // Name is the human-readable name
+	Status        string        `json:"status"`               // Status: pending, provisioning, ready, destroying, destroyed, failed
+	Provider      string        `json:"provider"`             // Provider (azure, aws, gcp)
+	Region        string        `json:"region"`               // Region
+	CreatedAt     time.Time     `json:"created_at"`           // CreatedAt timestamp
+	UpdatedAt     time.Time     `json:"updated_at"`           // UpdatedAt timestamp
+	ExpiresAt     time.Time     `json:"expires_at,omitempty"` // ExpiresAt for TTL-based cleanup (zero = no expiry)
+	Config        InfraConfig   `json:"config"`               // Config used to create this infrastructure
+	Outputs       *InfraOutputs `json:"outputs,omitempty"`    // Outputs from Terraform
+	WorkspacePath string        `json:"workspace_path"`       // WorkspacePath is the path to the Terraform workspace
+	Error         string        `json:"error,omitempty"`      // Error message if status is failed
 }
 
 // InfraOutputs contains the Terraform output values.
@@ -328,12 +328,12 @@ func (m *Manager) RefreshState(ctx context.Context, id string) (*InfraState, err
 
 	state.Outputs = outputs
 	state.UpdatedAt = time.Now()
-	
+
 	// Update status to ready if we have outputs
 	if outputs != nil && outputs.RedisHostname != "" {
 		state.Status = "ready"
 	}
-	
+
 	m.saveState(state)
 
 	return state, nil

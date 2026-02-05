@@ -87,7 +87,7 @@ func NewSSHExecutor(config ...SSHConfig) *SSHExecutor {
 		CommandTimeout: 5 * time.Minute,
 		MemtierPath:    "memtier_benchmark",
 	}
-	
+
 	// Allow overriding with provided config
 	if len(config) > 0 {
 		c := config[0]
@@ -120,7 +120,7 @@ func NewSSHExecutor(config ...SSHConfig) *SSHExecutor {
 			cfg.MemtierPath = c.MemtierPath
 		}
 	}
-	
+
 	return &SSHExecutor{
 		connections: make(map[string]*sshConnection),
 		executions:  make(map[string]*sshExecution),
@@ -732,7 +732,7 @@ func (m *MultiNodeExecutor) ExecuteOnHosts(ctx context.Context, hosts []string, 
 		go func(h string) {
 			defer wg.Done()
 
-				// Set SSH host in target labels
+			// Set SSH host in target labels
 			t := *target
 			if t.Labels == nil {
 				t.Labels = make(map[string]string)

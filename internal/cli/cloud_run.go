@@ -341,7 +341,7 @@ func runCloudRun(cmd *cobra.Command, args []string) error {
 			if !jsonOutput {
 				fmt.Printf("\n🧹 Cleaning up resources...\n")
 			}
-			
+
 			// Teardown VMs
 			if p != nil && infra != nil {
 				if err := p.Teardown(ctx, infra); err != nil {
@@ -351,7 +351,7 @@ func runCloudRun(cmd *cobra.Command, args []string) error {
 					fmt.Printf("   ✅ VMs torn down\n")
 				}
 			}
-			
+
 			// Delete AMR resource group (includes AMR instance)
 			if provisionAMR && resourceGroup != "" {
 				if !jsonOutput {
@@ -486,16 +486,16 @@ func runCloudRun(cmd *cobra.Command, args []string) error {
 
 	// Create result structure
 	runResult := &CloudRunResult{
-		InfraID:     infra.ID,
-		Provider:    provider,
-		Region:      region,
-		InstanceType: instanceType,
+		InfraID:       infra.ID,
+		Provider:      provider,
+		Region:        region,
+		InstanceType:  instanceType,
 		InstanceCount: len(hosts),
-		Workload:    workloadName,
-		Target:      targetStr,
-		StartTime:   time.Now().Add(-time.Minute), // Approximate
-		EndTime:     time.Now(),
-		HostResults: results,
+		Workload:      workloadName,
+		Target:        targetStr,
+		StartTime:     time.Now().Add(-time.Minute), // Approximate
+		EndTime:       time.Now(),
+		HostResults:   results,
 	}
 
 	// Output results
@@ -848,13 +848,13 @@ func runDistributedBenchmarkWithInfra(ctx context.Context, cmd *cobra.Command, w
 			start := time.Now()
 			output, err := runSSHCommand(ctx, runnerIP, sshUser, syncCmd)
 			end := time.Now()
-			
+
 			// Extract JSON data from output
 			var jsonData []byte
 			if err == nil {
 				jsonData = extractJSONFromOutput(output)
 			}
-			
+
 			resultsCh <- runnerResult{
 				ip:       runnerIP,
 				output:   output,
@@ -915,7 +915,7 @@ func runDistributedBenchmarkWithInfra(ctx context.Context, cmd *cobra.Command, w
 		fmt.Printf("  P50 Latency:    %.3f ms\n", s.P50LatencyMs)
 		fmt.Printf("  P99 Latency:    %.3f ms\n", s.P99LatencyMs)
 		fmt.Printf("  P99.9 Latency:  %.3f ms\n", s.P999LatencyMs)
-		
+
 		if len(aggregatedResults.ByOperation) > 0 {
 			fmt.Println()
 			fmt.Println("  By Operation:")
@@ -974,14 +974,14 @@ func runDistributedBenchmarkWithInfra(ctx context.Context, cmd *cobra.Command, w
 func extractJSONFromOutput(output string) []byte {
 	startMarker := "===JSON_OUTPUT_START==="
 	endMarker := "===JSON_OUTPUT_END==="
-	
+
 	startIdx := strings.Index(output, startMarker)
 	endIdx := strings.Index(output, endMarker)
-	
+
 	if startIdx == -1 || endIdx == -1 || endIdx <= startIdx {
 		return nil
 	}
-	
+
 	jsonStr := strings.TrimSpace(output[startIdx+len(startMarker) : endIdx])
 	return []byte(jsonStr)
 }
@@ -994,7 +994,7 @@ func parseAndAggregateResults(jsonDataList [][]byte) (*domain.Results, error) {
 
 	parser := memtier.NewParser()
 	var allResults []*domain.Results
-	
+
 	for i, data := range jsonDataList {
 		if len(data) == 0 {
 			continue
@@ -1027,7 +1027,7 @@ func parseAndAggregateResults(jsonDataList [][]byte) (*domain.Results, error) {
 			totalOps += r.Summary.OpsPerSecond
 			totalLatency += r.Summary.AvgLatencyMs
 			count++
-			
+
 			// Take max of percentile latencies (worst case)
 			if r.Summary.P50LatencyMs > aggregated.Summary.P50LatencyMs {
 				aggregated.Summary.P50LatencyMs = r.Summary.P50LatencyMs
@@ -1045,7 +1045,7 @@ func parseAndAggregateResults(jsonDataList [][]byte) (*domain.Results, error) {
 				aggregated.Summary.P999LatencyMs = r.Summary.P999LatencyMs
 			}
 		}
-		
+
 		// Aggregate by operation
 		for opName, opMetrics := range r.ByOperation {
 			if existing, ok := aggregated.ByOperation[opName]; ok {
@@ -1097,11 +1097,11 @@ func saveCloudBenchmarkRun(ctx context.Context, wl *domain.Workload, target *dom
 		Results:   results,
 		Tags:      []string{"cloud", state.Provider, state.Region},
 		Labels: map[string]string{
-			"cloud":           "true",
-			"provider":        state.Provider,
-			"region":          state.Region,
-			"infrastructure":  state.ID,
-			"runner_count":    fmt.Sprintf("%d", runnerCount),
+			"cloud":          "true",
+			"provider":       state.Provider,
+			"region":         state.Region,
+			"infrastructure": state.ID,
+			"runner_count":   fmt.Sprintf("%d", runnerCount),
 		},
 	}
 

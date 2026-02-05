@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -12,6 +13,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/tfindelkind-redis/redismeter/internal/api"
+	"github.com/tfindelkind-redis/redismeter/internal/infraprofile"
+	"github.com/tfindelkind-redis/redismeter/internal/logging"
 )
 
 // serveCmd starts the API server.
@@ -84,6 +87,26 @@ func runServe(cmd *cobra.Command, args []string) error {
 		defer closer.Close()
 	}
 
+	// Initialize extended feature stores
+	homeDir, _ := os.UserHomeDir()
+	basePath := filepath.Join(homeDir, ".redismeter")
+
+	// Initialize log store
+	logStore, err := logging.NewSQLiteStore(filepath.Join(basePath, "logs.db"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: Log storage not available: %v\n", err)
+	} else {
+		defer logStore.Close()
+	}
+
+	// Initialize infrastructure profile store
+	profileStore, err := infraprofile.NewFileStore(filepath.Join(basePath, "infra-profiles"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: Profile storage not available: %v\n", err)
+	} else {
+		defer profileStore.Close()
+	}
+
 	// Get server address
 	addr := viper.GetString("server.addr")
 	if port := viper.GetInt("server.port"); port != 0 && addr == ":8080" {
@@ -120,6 +143,18 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	// Create and start server
 	server := api.NewServer(cfg)
+
+	// Register extended feature routes
+	if logStore != nil {
+		logAdapter := &apiLogStoreAdapter{store: logStore}
+		server.RegisterLogRoutes(logAdapter)
+		fmt.Println("📝 Log API endpoints enabled")
+	}
+	if profileStore != nil {
+		profileAdapter := &apiProfileStoreAdapter{store: profileStore}
+		server.RegisterInfraProfileRoutes(profileAdapter)
+		fmt.Println("🏗️  Infrastructure Profile API endpoints enabled")
+	}
 
 	// Handle graceful shutdown
 	stop := make(chan os.Signal, 1)
@@ -164,4 +199,89 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	fmt.Println("✅ Server stopped gracefully")
 	return nil
+}
+
+// apiLogStoreAdapter adapts logging.SQLiteStore to the api.LogStore interface
+type apiLogStoreAdapter struct {
+	store *logging.SQLiteStore
+}
+
+func (a *apiLogStoreAdapter) Query(filter logging.QueryFilter) ([]*logging.Entry, error) {
+	return a.store.Query(context.Background(), &filter)
+}
+
+func (a *apiLogStoreAdapter) Count(filter logging.QueryFilter) (int, error) {
+	count, err := a.store.Count(context.Background(), &filter)
+	return int(count), err
+}
+
+func (a *apiLogStoreAdapter) GetStats() (*logging.StoreStats, error) {
+	return a.store.GetStats(context.Background())
+}
+
+func (a *apiLogStoreAdapter) Export(filter logging.QueryFilter, format string) ([]byte, error) {
+	var buf bytes.Buffer
+	err := a.store.Export(context.Background(), &filter, &buf)
+	return buf.Bytes(), err
+}
+
+func (a *apiLogStoreAdapter) Delete(filter logging.QueryFilter) (int, error) {
+	if filter.Since != nil {
+		count, err := a.store.Delete(context.Background(), *filter.Since)
+		return int(count), err
+	}
+	return 0, nil
+}
+
+// apiProfileStoreAdapter adapts infraprofile.FileStore to the api.InfraProfileStore interface
+type apiProfileStoreAdapter struct {
+	store *infraprofile.FileStore
+}
+
+func (a *apiProfileStoreAdapter) List(ctx interface{}) ([]*infraprofile.Profile, error) {
+	return a.store.List(context.Background())
+}
+
+func (a *apiProfileStoreAdapter) Get(ctx interface{}, id string) (*infraprofile.Profile, error) {
+	return a.store.Get(context.Background(), id)
+}
+
+func (a *apiProfileStoreAdapter) GetByName(ctx interface{}, name string) (*infraprofile.Profile, error) {
+	return a.store.GetByName(context.Background(), name)
+}
+
+func (a *apiProfileStoreAdapter) Create(ctx interface{}, profile *infraprofile.Profile) error {
+	return a.store.Create(context.Background(), profile)
+}
+
+func (a *apiProfileStoreAdapter) Update(ctx interface{}, profile *infraprofile.Profile) error {
+	return a.store.Update(context.Background(), profile)
+}
+
+func (a *apiProfileStoreAdapter) Delete(ctx interface{}, id string) error {
+	return a.store.Delete(context.Background(), id)
+}
+
+func (a *apiProfileStoreAdapter) ListByProvider(ctx interface{}, provider infraprofile.Provider) ([]*infraprofile.Profile, error) {
+	return a.store.ListByProvider(context.Background(), provider)
+}
+
+func (a *apiProfileStoreAdapter) ListByTag(ctx interface{}, tag string) ([]*infraprofile.Profile, error) {
+	return a.store.ListByTag(context.Background(), tag)
+}
+
+func (a *apiProfileStoreAdapter) RecordUsage(ctx interface{}, id string) error {
+	return a.store.RecordUsage(context.Background(), id)
+}
+
+func (a *apiProfileStoreAdapter) GetStats(ctx interface{}) (*infraprofile.ProfileStats, error) {
+	return a.store.GetStats(context.Background())
+}
+
+func (a *apiProfileStoreAdapter) ExportAll(ctx interface{}) ([]byte, error) {
+	return a.store.ExportAll(context.Background())
+}
+
+func (a *apiProfileStoreAdapter) ImportProfiles(ctx interface{}, data []byte, overwrite bool) (int, error) {
+	return a.store.ImportProfiles(context.Background(), data, overwrite)
 }

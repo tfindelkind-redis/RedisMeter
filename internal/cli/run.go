@@ -28,6 +28,17 @@ Available built-in workloads:
   low-latency    Optimized for minimal response time
   session        Session store simulation
   large-values   Testing with larger value sizes
+  huge-read      100% GET with 100KB values
+
+Available built-in run profiles:
+  default        Balanced settings (4 threads, 50 clients, 30s)
+  quick-test     Short validation test (2 threads, 10 clients, 10s)
+  high-load      Maximum parallelism (8 threads, 100 clients, 60s)
+  low-latency    Minimal pipelining for latency measurement
+  throughput     Aggressive pipelining for max throughput
+  stress         Extended stress test (300s duration)
+  rate-limited   Controlled request rate (10k req/s)
+  request-based  Fixed request count instead of duration
 
 Examples:
   # Run the cache workload against local Redis
@@ -35,6 +46,9 @@ Examples:
 
   # Run with custom duration and threads
   redismeter run cache --target redis://localhost:6379 --duration 60s --threads 4
+
+  # Run with a specific run profile
+  redismeter run cache --target redis://localhost:6379 --run-profile high-load
 
   # Run using a workload definition file
   redismeter run --workload-file ./my-workload.yaml --target redis://localhost:6379
@@ -51,6 +65,9 @@ var (
 	threadsFlag      int
 	clientsFlag      int
 	pipelineFlag     int
+	requestsFlag     int64
+	rateLimitFlag    int
+	runProfileFlag   string
 	workloadFileFlag string
 	runNameFlag      string
 	runTagsFlag      []string
@@ -64,6 +81,9 @@ func init() {
 	runCmd.Flags().IntVar(&threadsFlag, "threads", 0, "Number of threads")
 	runCmd.Flags().IntVar(&clientsFlag, "clients", 0, "Number of clients per thread")
 	runCmd.Flags().IntVar(&pipelineFlag, "pipeline", 0, "Pipeline depth")
+	runCmd.Flags().Int64VarP(&requestsFlag, "requests", "n", 0, "Number of requests (overrides duration)")
+	runCmd.Flags().IntVar(&rateLimitFlag, "rate-limit", 0, "Max requests per second per connection (0=unlimited)")
+	runCmd.Flags().StringVar(&runProfileFlag, "run-profile", "", "Run profile to use (default, quick-test, high-load, etc.)")
 	runCmd.Flags().StringVarP(&workloadFileFlag, "workload-file", "f", "", "Path to workload definition file")
 	runCmd.Flags().StringVar(&runNameFlag, "name", "", "Name for this benchmark run")
 	runCmd.Flags().StringSliceVar(&runTagsFlag, "tag", nil, "Tags for this run (can be specified multiple times)")
@@ -102,15 +122,18 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 
 	// Setup config
 	cfg := &engine.RunConfig{
-		WorkloadName: workloadName,
-		WorkloadFile: workloadFileFlag,
-		TargetURL:    targetFlag,
-		Duration:     durationFlag,
-		Threads:      threadsFlag,
-		Clients:      clientsFlag,
-		Pipeline:     pipelineFlag,
-		Name:         runNameFlag,
-		Tags:         runTagsFlag,
+		WorkloadName:   workloadName,
+		WorkloadFile:   workloadFileFlag,
+		RunProfileName: runProfileFlag,
+		TargetURL:      targetFlag,
+		Duration:       durationFlag,
+		Threads:        threadsFlag,
+		Clients:        clientsFlag,
+		Pipeline:       pipelineFlag,
+		Requests:       requestsFlag,
+		RateLimit:      rateLimitFlag,
+		Name:           runNameFlag,
+		Tags:           runTagsFlag,
 	}
 
 	// Setup context with cancellation

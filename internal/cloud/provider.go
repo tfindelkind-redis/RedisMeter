@@ -136,10 +136,10 @@ type RedisTargetSpec struct {
 type RedisTargetType string
 
 const (
-	RedisTargetManaged           RedisTargetType = "managed"              // AWS ElastiCache, GCP Memorystore, etc.
-	RedisTargetAzureManagedRedis RedisTargetType = "azure_managed_redis"  // Azure Managed Redis (AMR)
-	RedisTargetSelfHosted        RedisTargetType = "self_hosted"          // Redis on VMs
-	RedisTargetExisting          RedisTargetType = "existing"             // Connect to existing (direct endpoint)
+	RedisTargetManaged           RedisTargetType = "managed"             // AWS ElastiCache, GCP Memorystore, etc.
+	RedisTargetAzureManagedRedis RedisTargetType = "azure_managed_redis" // Azure Managed Redis (AMR)
+	RedisTargetSelfHosted        RedisTargetType = "self_hosted"         // Redis on VMs
+	RedisTargetExisting          RedisTargetType = "existing"            // Connect to existing (direct endpoint)
 )
 
 // AzureManagedRedisSpec defines Azure Managed Redis (AMR) configuration.

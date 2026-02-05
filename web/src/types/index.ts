@@ -275,6 +275,8 @@ export interface BenchmarkConfig {
     cluster?: boolean;
   };
   workload: string;
+  run_profile?: string;
+  // Optional overrides (when specified, override run_profile settings)
   threads?: number;
   clients?: number;
   duration?: string;
@@ -387,6 +389,7 @@ export interface InfraOutputs {
 export interface CloudBenchmarkConfig {
   infrastructure_id: string;
   workload?: string;
+  run_profile?: string;
   requests?: number;
   clients?: number;
   threads?: number;
@@ -438,4 +441,120 @@ export interface ProviderFormProps {
   initialValues?: Record<string, any>;
   onValuesChange?: (changedValues: any, allValues: any) => void;
   disabled?: boolean;
+}
+
+// ==========================================
+// Infrastructure Profiles
+// ==========================================
+
+export type InfraProfileProvider = 'azure' | 'aws' | 'gcp' | 'local' | 'custom';
+
+export interface InfraProfile {
+  id: string;
+  name: string;
+  description?: string;
+  provider: InfraProfileProvider;
+  tags?: string[];
+  config?: InfraProfileConfig;
+  use_count?: number;
+  created_at?: string;
+  updated_at?: string;
+  is_builtin?: boolean;
+}
+
+export interface InfraProfileConfig {
+  azure?: AzureInfraConfig;
+  aws?: AWSInfraConfig;
+  gcp?: GCPInfraConfig;
+  local?: LocalInfraConfig;
+  custom?: CustomInfraConfig;
+}
+
+export interface AzureInfraConfig {
+  subscription_id?: string;
+  resource_group?: string;
+  location: string;
+  // Redis configuration
+  sku: string;
+  family?: string;
+  capacity: number;
+  shard_count?: number;
+  redis_version?: string;
+  enable_non_ssl_port?: boolean;
+  minimum_tls_version?: string;
+  public_network_access?: string;
+  // Benchmark VM configuration
+  vm_size?: string;
+  vm_count?: number;
+  use_spot_vms?: boolean;
+  ssh_key_path?: string;
+  estimated_monthly_cost?: number;
+}
+
+export interface AWSInfraConfig {
+  region: string;
+  // ElastiCache configuration
+  node_type: string;
+  num_cache_nodes: number;
+  engine?: string;
+  engine_version?: string;
+  parameter_group_family?: string;
+  // Cluster mode
+  cluster_enabled?: boolean;
+  num_node_groups?: number;
+  replicas_per_node_group?: number;
+  // Networking
+  subnet_group_name?: string;
+  security_group_ids?: string[];
+  // Benchmark EC2 configuration
+  ec2_instance_type?: string;
+  ec2_count?: number;
+  use_spot_instances?: boolean;
+  ssh_key_name?: string;
+  estimated_monthly_cost?: number;
+}
+
+export interface GCPInfraConfig {
+  project_id?: string;
+  region: string;
+  zone?: string;
+  // Memorystore configuration
+  tier: string;
+  memory_size_gb: number;
+  redis_version?: string;
+  display_name?: string;
+  // Networking
+  authorized_network?: string;
+  connect_mode?: string;
+  // Benchmark VM configuration
+  machine_type?: string;
+  vm_count?: number;
+  preemptible?: boolean;
+  estimated_monthly_cost?: number;
+}
+
+export interface LocalInfraConfig {
+  host: string;
+  port: number;
+  password?: string;
+  tls?: boolean;
+  database?: number;
+}
+
+export interface CustomInfraConfig {
+  host: string;
+  port: number;
+  password?: string;
+  username?: string;
+  tls?: boolean;
+  database?: number;
+  description?: string;
+}
+
+export interface InfraProfileStats {
+  total_profiles: number;
+  by_provider: Record<string, number>;
+  most_used?: InfraProfile;
+  recently_created?: InfraProfile;
+  recently_used?: InfraProfile;
 }
