@@ -68,31 +68,66 @@ type ProfileConfig struct {
 	Custom *CustomConfig `json:"custom,omitempty"`
 }
 
-// AzureConfig holds Azure Cache for Redis configuration.
+// AzureConfig holds Azure Managed Redis (AMR) configuration.
+// Note: RedisMeter only supports Azure Managed Redis, not Azure Cache for Redis.
 type AzureConfig struct {
 	// Subscription and resource group
 	SubscriptionID string `json:"subscription_id,omitempty"`
 	ResourceGroup  string `json:"resource_group,omitempty"`
 	Location       string `json:"location"`
 
-	// Redis configuration
-	SKU      string `json:"sku"`      // Basic, Standard, Premium, Enterprise
-	Family   string `json:"family"`   // C (Basic/Standard), P (Premium), E (Enterprise)
-	Capacity int    `json:"capacity"` // 0-6 for Basic/Standard, 1-5 for Premium
+	// Instance name (without .redis.azure.net suffix)
+	InstanceName string `json:"instance_name,omitempty"`
+
+	// Performance tier configuration
+	// Data tier: "in-memory" (default) or "flash"
+	DataTier string `json:"data_tier,omitempty"`
+
+	// Azure Managed Redis configuration
+	// SKU format: Family_Size (e.g., Balanced_B5, ComputeOptimized_X10, MemoryOptimized_M20, FlashOptimized_F300)
+	SKU string `json:"sku"`
+
+	// HighAvailability enables zone redundancy
+	HighAvailability bool `json:"high_availability,omitempty"`
+
+	// Persistence settings
+	PersistenceType string `json:"persistence_type,omitempty"` // "", "rdb", "aof"
+	RDBFrequency    string `json:"rdb_frequency,omitempty"`    // "1h", "6h", "12h"
+	AOFFrequency    string `json:"aof_frequency,omitempty"`    // "1s", "always"
+
+	// Modules to enable
+	Modules []string `json:"modules,omitempty"` // RedisJSON, RediSearch, RedisBloom, RedisTimeSeries
+
+	// Advanced settings
+	EvictionPolicy      string `json:"eviction_policy,omitempty"`       // noeviction, allkeys-lru, volatile-lru, etc.
+	ClusteringPolicy    string `json:"clustering_policy,omitempty"`     // non-clustered, oss, enterprise
+	NonTLSAccessOnly    bool   `json:"non_tls_access_only,omitempty"`   // Allow non-TLS connections
+	AccessKeysAuth      bool   `json:"access_keys_auth,omitempty"`      // Enable access key authentication
+	CustomerManagedKey  bool   `json:"customer_managed_key,omitempty"`  // Use customer-managed encryption key
+	DeferVersionUpdates bool   `json:"defer_version_updates,omitempty"` // Defer automatic Redis version updates
+
+	// Customer-managed key configuration (when CustomerManagedKey=true)
+	UserAssignedIdentityID string `json:"user_assigned_identity_id,omitempty"` // Resource ID of user-assigned managed identity
+	KeyInputMethod         string `json:"key_input_method,omitempty"`          // "select" or "uri"
+	// For "select" method:
+	KeyVaultSubscriptionID string `json:"key_vault_subscription_id,omitempty"` // Subscription ID containing the Key Vault
+	KeyVaultName           string `json:"key_vault_name,omitempty"`            // Name of the Key Vault
+	KeyName                string `json:"key_name,omitempty"`                  // Name of the encryption key (RSA)
+	KeyVersion             string `json:"key_version,omitempty"`               // Optional: specific key version (empty = latest)
+	// For "uri" method:
+	KeyIdentifierURI       string `json:"key_identifier_uri,omitempty"`        // Full key identifier URI
+
+	// Active geo-replication (requires cache size >= 3GB)
+	ActiveGeoReplication     bool   `json:"active_geo_replication,omitempty"`
+	GeoReplicationGroupName  string `json:"geo_replication_group_name,omitempty"`
 
 	// Networking
-	EnableNonSSLPort bool   `json:"enable_non_ssl_port"`
-	MinTLSVersion    string `json:"min_tls_version,omitempty"` // 1.0, 1.1, 1.2
-
-	// Features (Premium only)
-	ShardCount         int  `json:"shard_count,omitempty"`
-	ReplicasPerPrimary int  `json:"replicas_per_primary,omitempty"`
-	ZoneRedundant      bool `json:"zone_redundant,omitempty"`
+	UsePrivateEndpoint bool `json:"use_private_endpoint,omitempty"`
+	AllowPublicAccess  bool `json:"allow_public_access,omitempty"`
 
 	// Benchmark VM configuration
 	VMSize     string `json:"vm_size,omitempty"`
 	VMCount    int    `json:"vm_count,omitempty"`
-	UseSpotVMs bool   `json:"use_spot_vms,omitempty"`
 	SSHKeyPath string `json:"ssh_key_path,omitempty"`
 
 	// Estimated costs
@@ -214,68 +249,64 @@ type Store interface {
 }
 
 // Predefined profiles for common scenarios.
+// Note: Azure profiles use Azure Managed Redis (AMR), not Azure Cache for Redis.
 var PredefinedProfiles = []Profile{
 	{
-		ID:          "azure-basic-dev",
-		Name:        "Azure Basic (Development)",
-		Description: "Low-cost Azure Cache for development and testing",
-		Provider:    ProviderAzure,
-		Tags:        []string{"development", "low-cost", "builtin"},
-		IsBuiltin:   true,
-		Config: ProfileConfig{
-			Azure: &AzureConfig{
-				Location:             "westus3",
-				SKU:                  "Basic",
-				Family:               "C",
-				Capacity:             0,
-				EnableNonSSLPort:     true,
-				VMSize:               "Standard_B2s",
-				VMCount:              1,
-				EstimatedMonthlyCost: 20,
-			},
-		},
-	},
-	{
-		ID:          "azure-standard-staging",
-		Name:        "Azure Standard (Staging)",
-		Description: "Azure Cache Standard for staging environments",
+		ID:          "azure-amr-staging",
+		Name:        "Azure Managed Redis (Staging)",
+		Description: "Azure Managed Redis with HA for staging environments",
 		Provider:    ProviderAzure,
 		Tags:        []string{"staging", "ha", "builtin"},
 		IsBuiltin:   true,
 		Config: ProfileConfig{
 			Azure: &AzureConfig{
 				Location:             "westus3",
-				SKU:                  "Standard",
-				Family:               "C",
-				Capacity:             1,
-				EnableNonSSLPort:     false,
-				MinTLSVersion:        "1.2",
+				SKU:                  "Balanced_B1",
+				HighAvailability:     true,
+				UsePrivateEndpoint:   true,
 				VMSize:               "Standard_D2s_v3",
 				VMCount:              1,
-				EstimatedMonthlyCost: 80,
+				EstimatedMonthlyCost: 150,
 			},
 		},
 	},
 	{
-		ID:          "azure-premium-production",
-		Name:        "Azure Premium (Production)",
-		Description: "High-performance Azure Cache for production workloads",
+		ID:          "azure-amr-production",
+		Name:        "Azure Managed Redis (Production)",
+		Description: "High-performance Azure Managed Redis with HA and persistence",
 		Provider:    ProviderAzure,
 		Tags:        []string{"production", "enterprise", "ha", "builtin"},
 		IsBuiltin:   true,
 		Config: ProfileConfig{
 			Azure: &AzureConfig{
 				Location:             "westus3",
-				SKU:                  "Premium",
-				Family:               "P",
-				Capacity:             1,
-				EnableNonSSLPort:     false,
-				MinTLSVersion:        "1.2",
-				ReplicasPerPrimary:   1,
-				ZoneRedundant:        true,
+				SKU:                  "Balanced_B5",
+				HighAvailability:     true,
+				PersistenceType:      "rdb",
+				UsePrivateEndpoint:   true,
 				VMSize:               "Standard_D4s_v3",
 				VMCount:              2,
-				EstimatedMonthlyCost: 350,
+				EstimatedMonthlyCost: 500,
+			},
+		},
+	},
+	{
+		ID:          "azure-amr-search",
+		Name:        "Azure Managed Redis (Search)",
+		Description: "Azure Managed Redis with RediSearch for vector and full-text search",
+		Provider:    ProviderAzure,
+		Tags:        []string{"production", "search", "vector", "builtin"},
+		IsBuiltin:   true,
+		Config: ProfileConfig{
+			Azure: &AzureConfig{
+				Location:             "westus3",
+				SKU:                  "MemoryOptimized_M10",
+				HighAvailability:     true,
+				Modules:              []string{"RediSearch", "RedisJSON"},
+				UsePrivateEndpoint:   true,
+				VMSize:               "Standard_D4s_v3",
+				VMCount:              2,
+				EstimatedMonthlyCost: 800,
 			},
 		},
 	},
@@ -355,23 +386,25 @@ func (p *Profile) Validate() error {
 	}
 }
 
-// Validate validates Azure configuration.
+// Validate validates Azure Managed Redis configuration.
 func (c *AzureConfig) Validate() error {
 	if c.Location == "" {
 		return fmt.Errorf("location is required")
 	}
 	if c.SKU == "" {
-		return fmt.Errorf("sku is required")
+		return fmt.Errorf("sku is required (e.g., Balanced_B5, ComputeOptimized_X10, MemoryOptimized_M20)")
 	}
-	validSKUs := map[string]bool{"Basic": true, "Standard": true, "Premium": true, "Enterprise": true}
-	if !validSKUs[c.SKU] {
-		return fmt.Errorf("invalid sku: %s (must be Basic, Standard, Premium, or Enterprise)", c.SKU)
+	// Validate SKU format: Family_Size
+	validFamilies := []string{"Balanced_B", "ComputeOptimized_X", "MemoryOptimized_M", "FlashOptimized_F"}
+	validSKU := false
+	for _, family := range validFamilies {
+		if len(c.SKU) > len(family) && c.SKU[:len(family)] == family {
+			validSKU = true
+			break
+		}
 	}
-	if c.Family == "" {
-		return fmt.Errorf("family is required")
-	}
-	if c.Capacity < 0 || c.Capacity > 6 {
-		return fmt.Errorf("capacity must be between 0 and 6")
+	if !validSKU {
+		return fmt.Errorf("invalid SKU format: %s (must be Family_Size, e.g., Balanced_B5)", c.SKU)
 	}
 	return nil
 }

@@ -15,6 +15,7 @@ import {
   message,
   Modal,
   Input,
+  Divider,
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -310,26 +311,82 @@ export default function RunDetail() {
 
             <Col xs={24} lg={12}>
               <Card title="Environment" style={{ background: '#1f1f1f', border: '1px solid #303030' }}>
-                <Descriptions column={1} size="small">
-                  <Descriptions.Item label="Hostname">
-                    {run.environment?.host?.hostname}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="OS">
-                    {run.environment?.host?.os} / {run.environment?.host?.arch}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="CPUs">
-                    {run.environment?.host?.cpus}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Memory">
-                    {run.environment?.host?.memory_gb?.toFixed(1)} GB
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Redis Version">
-                    {run.environment?.redis?.version}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="Fingerprint">
-                    <Text code style={{ fontSize: 10 }}>{run.environment?.fingerprint}</Text>
-                  </Descriptions.Item>
-                </Descriptions>
+                <Space direction="vertical" style={{ width: '100%' }} size="small">
+                  <Text strong>Host</Text>
+                  <Descriptions column={1} size="small">
+                    <Descriptions.Item label="Hostname">
+                      {run.environment?.host?.hostname || '-'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="OS">
+                      {run.environment?.host?.os || '-'} / {run.environment?.host?.arch || '-'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="CPUs">
+                      {run.environment?.host?.cpus || '-'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Memory">
+                      {run.environment?.host?.memory_gb?.toFixed(1) || '-'} GB
+                    </Descriptions.Item>
+                    {run.environment?.host?.cpu_model && (
+                      <Descriptions.Item label="CPU Model">
+                        {run.environment.host.cpu_model}
+                      </Descriptions.Item>
+                    )}
+                  </Descriptions>
+
+                  <Divider style={{ margin: '8px 0' }} />
+                  <Text strong>Redis Server</Text>
+                  <Descriptions column={1} size="small">
+                    <Descriptions.Item label="Version">
+                      {run.environment?.redis?.version || '-'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Mode">
+                      <Tag color={run.environment?.redis?.cluster_enabled ? 'purple' : 'blue'}>
+                        {run.environment?.redis?.mode || 'standalone'}
+                      </Tag>
+                    </Descriptions.Item>
+                    {run.environment?.redis?.memory_used !== undefined && (
+                      <Descriptions.Item label="Memory Used">
+                        {((run.environment.redis.memory_used || 0) / (1024 * 1024)).toFixed(2)} MB
+                        {run.environment.redis.memory_max !== undefined && run.environment.redis.memory_max > 0 &&
+                          ` / ${(run.environment.redis.memory_max / (1024 * 1024)).toFixed(0)} MB`}
+                      </Descriptions.Item>
+                    )}
+                    {run.environment?.redis?.connected_clients !== undefined && (
+                      <Descriptions.Item label="Clients">
+                        {run.environment.redis.connected_clients} connected
+                      </Descriptions.Item>
+                    )}
+                    {run.environment?.redis?.total_keys !== undefined && run.environment.redis.total_keys > 0 && (
+                      <Descriptions.Item label="Keys">
+                        {run.environment.redis.total_keys.toLocaleString()}
+                        {run.environment.redis.total_expires !== undefined && run.environment.redis.total_expires > 0 &&
+                          ` (${run.environment.redis.total_expires.toLocaleString()} with TTL)`}
+                      </Descriptions.Item>
+                    )}
+                    {run.environment?.redis?.evicted_keys !== undefined && run.environment.redis.evicted_keys > 0 && (
+                      <Descriptions.Item label="Evicted Keys">
+                        <Text type="warning">{run.environment.redis.evicted_keys.toLocaleString()}</Text>
+                      </Descriptions.Item>
+                    )}
+                    {run.environment?.redis?.instantaneous_ops_per_sec !== undefined && run.environment.redis.instantaneous_ops_per_sec > 0 && (
+                      <Descriptions.Item label="Baseline Load">
+                        {run.environment.redis.instantaneous_ops_per_sec.toLocaleString()} ops/sec
+                      </Descriptions.Item>
+                    )}
+                  </Descriptions>
+
+                  <Divider style={{ margin: '8px 0' }} />
+                  <Descriptions column={1} size="small">
+                    {run.environment?.network_latency_ms !== undefined && run.environment.network_latency_ms > 0 && (
+                      <Descriptions.Item label="Network Latency">
+                        {run.environment.network_latency_ms.toFixed(2)} ms
+                      </Descriptions.Item>
+                    )}
+                    <Descriptions.Item label="Fingerprint">
+                      <Text code style={{ fontSize: 10 }}>{run.environment?.fingerprint || '-'}</Text>
+                    </Descriptions.Item>
+                  </Descriptions>
+                </Space>
               </Card>
             </Col>
           </Row>

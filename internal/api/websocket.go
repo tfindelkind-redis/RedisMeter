@@ -229,21 +229,29 @@ func (c *WebSocketConn) readPump() {
 		c.conn.Close()
 	}()
 
-	c.conn.SetReadLimit(512)
-	c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+	c.conn.SetReadLimit(1024)
+	c.conn.SetReadDeadline(time.Now().Add(90 * time.Second)) // Extended timeout
 	c.conn.SetPongHandler(func(string) error {
-		c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		c.conn.SetReadDeadline(time.Now().Add(90 * time.Second))
 		return nil
 	})
 
 	for {
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+			// Only log unexpected errors (not normal closes)
+			if websocket.IsUnexpectedCloseError(err, 
+				websocket.CloseGoingAway, 
+				websocket.CloseAbnormalClosure,
+				websocket.CloseNormalClosure,
+				websocket.CloseNoStatusReceived) {
 				log.Printf("WebSocket read error: %v", err)
 			}
 			break
 		}
+
+		// Reset read deadline on any message (including pings)
+		c.conn.SetReadDeadline(time.Now().Add(90 * time.Second))
 
 		// Handle incoming messages (e.g., subscribe/unsubscribe)
 		c.handleMessage(message)
@@ -263,17 +271,21 @@ func (c *WebSocketConn) writePump() {
 		case message, ok := <-c.send:
 			c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 			if !ok {
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				// Channel closed, send close message gracefully
+				c.conn.WriteMessage(websocket.CloseMessage, 
+					websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 				return
 			}
 
 			if err := c.conn.WriteMessage(websocket.TextMessage, message); err != nil {
+				// Write error - connection is likely dead, exit silently
 				return
 			}
 
 		case <-ticker.C:
 			c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				// Ping failed - connection is dead, exit silently
 				return
 			}
 		}

@@ -23,6 +23,7 @@ import {
   SettingOutlined,
 } from '@ant-design/icons';
 import { CloudProvider } from '@/types';
+import { encryptSensitiveFields } from '@/utils/encryption';
 import { 
   PROVIDER_INFO, 
   PROVIDER_COMPONENTS, 
@@ -41,6 +42,7 @@ const ProviderIcon = ({ provider }: { provider: CloudProvider }) => {
     kubernetes: { color: '#326ce5', label: 'K8s' },
     vmware: { color: '#607078', label: 'VMw' },
     local: { color: '#52c41a', label: 'Local' },
+    self_managed: { color: '#722ed1', label: 'BYOI' },
   };
   const style = iconStyles[provider];
   return (
@@ -92,8 +94,73 @@ export default function InfrastructureNew() {
     setProvisioning(true);
 
     try {
-      // Build infrastructure config from form values
-      const config = {
+      let config: any;
+
+      // Handle self-managed infrastructure differently
+      if (activeProvider === 'self_managed') {
+        // Build self-managed config with encrypted credentials
+        const selfManagedConfig = {
+          runners: {
+            machines: values.runners_list || [],
+            ssh: {
+              auth_method: values.ssh_auth_method,
+              username: values.ssh_username,
+              password: values.ssh_password,
+              private_key: values.ssh_private_key,
+              private_key_path: values.ssh_private_key_path,
+              passphrase: values.ssh_key_passphrase,
+              port: values.ssh_port || 22,
+              connect_timeout: values.ssh_connect_timeout || 30,
+              strict_host_key_checking: values.ssh_strict_host_key || false,
+            },
+          },
+          redis: {
+            targets: values.redis_targets_list || [],
+            credentials: {
+              username: values.redis_username,
+              password: values.redis_password,
+              tls_enabled: values.redis_tls_enabled || false,
+              tls_skip_verify: values.redis_tls_skip_verify || false,
+              tls_cert: values.redis_tls_cert,
+              tls_key: values.redis_tls_key,
+              tls_ca: values.redis_tls_ca,
+            },
+          },
+          tool_paths: {
+            memtier_benchmark: values.memtier_path,
+            redis_cli: values.redis_cli_path,
+            ftsb: values.ftsb_path,
+            ann_benchmarks: values.ann_benchmarks_path,
+          },
+        };
+
+        // Encrypt sensitive fields before sending
+        const { data: encryptedConfig, encryptionKey } = await encryptSensitiveFields(selfManagedConfig);
+
+        config = {
+          name: values.name,
+          provider: 'self_managed',
+          region: 'custom',
+          tags: values.tags ? parseTags(values.tags) : undefined,
+          self_managed: encryptedConfig,
+          encryption_key: encryptionKey,
+        };
+
+        // Self-managed infra is immediately "ready" (no provisioning needed)
+        const result = await api.createInfrastructure(config);
+        
+        setProgress(100);
+        setCurrentStep(2);
+        setProvisioning(false);
+        message.success('Self-managed infrastructure registered successfully!');
+        setTimeout(() => {
+          navigate(`/infrastructure/${result.id}`);
+        }, 1500);
+        return;
+      }
+
+      // Build cloud infrastructure config from form values
+      config = {
         name: values.name,
         provider: activeProvider,
         region: values.region,
@@ -199,7 +266,7 @@ export default function InfrastructureNew() {
     <div>
       <Title level={3} style={{ color: 'rgba(255,255,255,0.85)', marginBottom: 24 }}>
         <CloudOutlined style={{ marginRight: 8, color: '#0078d4' }} />
-        New Cloud Infrastructure
+        New Infrastructure
       </Title>
 
       {/* Progress Steps */}

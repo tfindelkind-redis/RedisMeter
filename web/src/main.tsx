@@ -9,9 +9,16 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ConfigProvider
       theme={{
-        algorithm: theme.defaultAlgorithm,
+        algorithm: theme.darkAlgorithm,
         token: {
           colorPrimary: '#DC382D',
+          colorBgContainer: '#1a1a1a',
+          colorBgElevated: '#242424',
+          colorBgLayout: '#0d0d0d',
+          colorBorder: '#333333',
+          colorBorderSecondary: '#2a2a2a',
+          colorText: 'rgba(255, 255, 255, 0.85)',
+          colorTextSecondary: 'rgba(255, 255, 255, 0.65)',
           borderRadius: 6,
         },
       }}

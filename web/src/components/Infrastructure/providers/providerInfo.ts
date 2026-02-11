@@ -122,4 +122,13 @@ export const PROVIDER_INFO: Record<CloudProvider, ProviderInfo> = {
     regions: [{ id: 'local', name: 'Local Machine', available: true }],
     instance_types: [],
   },
+  self_managed: {
+    id: 'self_managed',
+    name: 'Self-Managed',
+    icon: 'cluster',
+    description: 'Connect to your own machines via SSH and benchmark any Redis deployment',
+    enabled: true,
+    regions: [{ id: 'custom', name: 'Custom Location', available: true }],
+    instance_types: [], // N/A - user provides their own machines
+  },
 };

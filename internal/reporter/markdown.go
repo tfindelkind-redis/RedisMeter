@@ -113,16 +113,27 @@ func (r *MarkdownReporter) Generate(ctx context.Context, report *Report, w io.Wr
 		if run.Environment != nil {
 			sb.WriteString("## Environment\n\n")
 
-			sb.WriteString("### Host\n\n")
-			sb.WriteString(fmt.Sprintf("- **Hostname**: %s\n", run.Environment.Hostname))
-			sb.WriteString(fmt.Sprintf("- **OS**: %s %s\n", run.Environment.OS, run.Environment.Arch))
-			sb.WriteString(fmt.Sprintf("- **CPUs**: %d\n", run.Environment.CPUCores))
-			sb.WriteString(fmt.Sprintf("- **Memory**: %.1f GB\n", run.Environment.MemoryGB))
-			sb.WriteString("\n")
+			if run.Environment.Host != nil {
+				sb.WriteString("### Host\n\n")
+				sb.WriteString(fmt.Sprintf("- **Hostname**: %s\n", run.Environment.Host.Hostname))
+				sb.WriteString(fmt.Sprintf("- **OS**: %s %s\n", run.Environment.Host.OS, run.Environment.Host.Arch))
+				sb.WriteString(fmt.Sprintf("- **CPUs**: %d\n", run.Environment.Host.CPUs))
+				sb.WriteString(fmt.Sprintf("- **Memory**: %.1f GB\n", run.Environment.Host.MemoryGB))
+				sb.WriteString("\n")
+			}
 
-			if run.Environment.RedisVersion != "" {
+			if run.Environment.Redis != nil && run.Environment.Redis.Version != "" {
 				sb.WriteString("### Redis\n\n")
-				sb.WriteString(fmt.Sprintf("- **Version**: %s\n", run.Environment.RedisVersion))
+				sb.WriteString(fmt.Sprintf("- **Version**: %s\n", run.Environment.Redis.Version))
+				if run.Environment.Redis.Mode != "" {
+					sb.WriteString(fmt.Sprintf("- **Mode**: %s\n", run.Environment.Redis.Mode))
+				}
+				if run.Environment.Redis.MemoryUsed > 0 {
+					sb.WriteString(fmt.Sprintf("- **Memory Used**: %.2f MB\n", float64(run.Environment.Redis.MemoryUsed)/(1024*1024)))
+				}
+				if run.Environment.Redis.ConnectedClients > 0 {
+					sb.WriteString(fmt.Sprintf("- **Connected Clients**: %d\n", run.Environment.Redis.ConnectedClients))
+				}
 				sb.WriteString("\n")
 			}
 		}

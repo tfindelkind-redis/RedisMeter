@@ -52,6 +52,7 @@ const providerColors: Record<CloudProvider, string> = {
   kubernetes: '#326ce5',
   vmware: '#607078',
   local: '#52c41a',
+  self_managed: '#722ed1',
 };
 
 export default function InfrastructureList() {
@@ -247,7 +248,7 @@ export default function InfrastructureList() {
         <Col>
           <Title level={3} style={{ color: 'rgba(255,255,255,0.85)', margin: 0 }}>
             <CloudOutlined style={{ marginRight: 8, color: '#0078d4' }} />
-            Cloud Infrastructure
+            Infrastructure
           </Title>
         </Col>
         <Col>

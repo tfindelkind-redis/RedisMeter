@@ -49,12 +49,16 @@ func createTestRun() *domain.BenchmarkRun {
 		},
 		Environment: &domain.Environment{
 			Fingerprint:       "abc123",
-			Hostname:          "test-host",
-			OS:                "linux",
-			Arch:              "amd64",
+			Host: &domain.HostInfo{
+				Hostname: "test-host",
+				OS:       "linux",
+				Arch:     "amd64",
+			},
+			Redis: &domain.RedisInfo{
+				Version: "7.0.0",
+			},
 			RedisMeterVersion: "0.1.0",
 			MemtierVersion:    "2.0.0",
-			RedisVersion:      "7.0.0",
 		},
 		Duration:  "5m30s",
 		StartTime: time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC),

@@ -545,6 +545,16 @@ func (e *SSHExecutor) buildMemtierCommand(workload *domain.Workload, target *dom
 	args = append(args, "-s", target.Host)
 	args = append(args, "-p", fmt.Sprintf("%d", target.Port))
 
+	// Cluster mode (for Redis Cluster or AMR OSSCluster)
+	if target.Cluster {
+		args = append(args, "--cluster-mode")
+	}
+
+	// TLS settings (required for AMR)
+	if target.TLS != nil && target.TLS.Enabled {
+		args = append(args, "--tls", "--tls-skip-verify")
+	}
+
 	// Authentication
 	if target.Password != "" {
 		args = append(args, "-a", target.Password)
@@ -582,7 +592,26 @@ func (e *SSHExecutor) buildMemtierCommand(workload *domain.Workload, target *dom
 			args = append(args, "-d", fmt.Sprintf("%d", workload.DataSize.Fixed))
 		}
 		if workload.KeyPattern != nil && workload.KeyPattern.Pattern != "" {
-			args = append(args, "--key-pattern", workload.KeyPattern.Pattern)
+			// Convert friendly names to memtier format
+			pattern := workload.KeyPattern.Pattern
+			switch strings.ToLower(pattern) {
+			case "random":
+				pattern = "R:R"
+			case "sequential":
+				pattern = "S:S"
+			case "gaussian":
+				pattern = "G:G"
+			case "zipf":
+				pattern = "Z:Z"
+			case "parallel":
+				pattern = "P:P"
+			default:
+				// If pattern doesn't contain ":", assume it's single char and duplicate
+				if !strings.Contains(pattern, ":") {
+					pattern = pattern + ":" + pattern
+				}
+			}
+			args = append(args, "--key-pattern", pattern)
 		}
 		if workload.Pipeline > 0 {
 			args = append(args, "--pipeline", fmt.Sprintf("%d", workload.Pipeline))
@@ -592,7 +621,14 @@ func (e *SSHExecutor) buildMemtierCommand(workload *domain.Workload, target *dom
 	// JSON output for parsing
 	args = append(args, "--json-out-file=/tmp/memtier_results.json")
 
-	return strings.Join(args, " ")
+	// Build base command
+	baseCmd := strings.Join(args, " ")
+
+	// Wrap command to output JSON with markers for parsing
+	// This ensures the JSON data can be extracted from the command output
+	wrappedCmd := fmt.Sprintf("%s && echo '===JSON_OUTPUT_START===' && cat /tmp/memtier_results.json && echo '===JSON_OUTPUT_END==='", baseCmd)
+
+	return wrappedCmd
 }
 
 // runRemoteCommand executes the command on the remote host.

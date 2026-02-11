@@ -179,24 +179,33 @@ func (e *Exporter) prepareRunData(run *domain.BenchmarkRun) map[string]interface
 		}
 
 		// Host information
-		if env.Hostname != "" || env.OS != "" {
+		if env.Host != nil && (env.Host.Hostname != "" || env.Host.OS != "") {
 			envData["host"] = map[string]interface{}{
-				"hostname":  env.Hostname,
-				"os":        env.OS,
-				"arch":      env.Arch,
-				"cpu_model": env.CPUModel,
-				"cpu_cores": env.CPUCores,
-				"memory_gb": env.MemoryGB,
+				"hostname":  env.Host.Hostname,
+				"os":        env.Host.OS,
+				"arch":      env.Host.Arch,
+				"cpu_model": env.Host.CPUModel,
+				"cpus":      env.Host.CPUs,
+				"memory_gb": env.Host.MemoryGB,
 			}
 		}
 
 		// Redis information
-		if env.RedisVersion != "" {
-			envData["redis"] = map[string]interface{}{
-				"version": env.RedisVersion,
-				"config":  env.RedisConfig,
-				"modules": env.RedisModules,
+		if env.Redis != nil && env.Redis.Version != "" {
+			redisData := map[string]interface{}{
+				"version":           env.Redis.Version,
+				"mode":              env.Redis.Mode,
+				"memory_used":       env.Redis.MemoryUsed,
+				"memory_max":        env.Redis.MemoryMax,
+				"connected_clients": env.Redis.ConnectedClients,
+				"evicted_keys":      env.Redis.EvictedKeys,
+				"total_keys":        env.Redis.TotalKeys,
+				"modules":           env.Redis.Modules,
 			}
+			if env.Redis.Config != nil {
+				redisData["config"] = env.Redis.Config
+			}
+			envData["redis"] = redisData
 		}
 
 		// Cloud information

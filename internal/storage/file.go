@@ -38,7 +38,7 @@ func NewFileStorage(baseDir string) (*FileStorage, error) {
 	dirs := []string{
 		baseDir,
 		filepath.Join(baseDir, "runs"),
-		filepath.Join(baseDir, "baselines"),
+		filepath.Join(baseDir, "baseline"),
 		filepath.Join(baseDir, "workloads"),
 		filepath.Join(baseDir, "config"),
 	}
@@ -112,6 +112,12 @@ func (fs *FileStorage) Save(ctx context.Context, entityType string, entity inter
 		return "", fmt.Errorf("failed to marshal entity: %w", err)
 	}
 
+	// Ensure directory exists
+	dir := fs.entityDir(entityType)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create directory %s: %w", dir, err)
+	}
+
 	path := fs.entityPath(entityType, id)
 	if err := os.WriteFile(path, data, 0644); err != nil {
 		return "", fmt.Errorf("failed to write file: %w", err)
@@ -155,6 +161,58 @@ func (fs *FileStorage) Query(ctx context.Context, entityType string, filter plug
 		return fmt.Errorf("failed to read directory: %w", err)
 	}
 
+	// Handle different entity types
+	switch entityType {
+	case "baseline":
+		return fs.queryBaselines(entries, dir, filter, dest)
+	default:
+		return fs.queryRuns(entries, dir, filter, dest)
+	}
+}
+
+// queryBaselines handles querying baseline entities.
+func (fs *FileStorage) queryBaselines(entries []os.DirEntry, dir string, filter plugin.QueryFilter, dest interface{}) error {
+	var results []*domain.Baseline
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+
+		path := filepath.Join(dir, entry.Name())
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+
+		var baseline domain.Baseline
+		if err := json.Unmarshal(data, &baseline); err != nil {
+			continue
+		}
+
+		results = append(results, &baseline)
+	}
+
+	// Sort by created_at descending (newest first)
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].CreatedAt.After(results[j].CreatedAt)
+	})
+
+	// Apply limit
+	if filter.Limit > 0 && len(results) > filter.Limit {
+		results = results[:filter.Limit]
+	}
+
+	// Copy to destination
+	if baselinesPtr, ok := dest.(*[]*domain.Baseline); ok {
+		*baselinesPtr = results
+	}
+
+	return nil
+}
+
+// queryRuns handles querying benchmark run entities.
+func (fs *FileStorage) queryRuns(entries []os.DirEntry, dir string, filter plugin.QueryFilter, dest interface{}) error {
 	var results []*domain.BenchmarkRun
 
 	for _, entry := range entries {

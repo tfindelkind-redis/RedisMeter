@@ -23,9 +23,8 @@ func TestProfileValidation(t *testing.T) {
 				Config: ProfileConfig{
 					Azure: &AzureConfig{
 						Location: "eastus",
-						SKU:      "Basic",
-						Family:   "C",
-						Capacity: 0,
+						SKU:      "Balanced_B0",
+						Template: "dev-test",
 					},
 				},
 			},
@@ -67,8 +66,8 @@ func TestProfileValidation(t *testing.T) {
 				Config: ProfileConfig{
 					Azure: &AzureConfig{
 						Location: "eastus",
-						SKU:      "Basic",
-						Family:   "C",
+						SKU:      "Balanced_B0",
+						Template: "dev-test",
 					},
 				},
 			},
@@ -100,13 +99,13 @@ func TestProfileValidation(t *testing.T) {
 				Config: ProfileConfig{
 					Azure: &AzureConfig{
 						Location: "eastus",
-						SKU:      "Invalid",
-						Family:   "C",
+						SKU:      "Invalid_X99",
+						Template: "dev-test",
 					},
 				},
 			},
 			wantErr: true,
-			errMsg:  "invalid sku",
+			errMsg:  "invalid SKU format",
 		},
 	}
 
@@ -135,28 +134,32 @@ func TestAzureConfigValidation(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "valid",
+			name: "valid AMR config",
 			config: AzureConfig{
 				Location: "eastus",
-				SKU:      "Premium",
-				Family:   "P",
-				Capacity: 1,
+				SKU:      "Balanced_B5",
+				Template: "durable",
 			},
 			wantErr: false,
 		},
 		{
 			name:    "missing location",
-			config:  AzureConfig{SKU: "Basic", Family: "C"},
+			config:  AzureConfig{SKU: "Balanced_B0", Template: "dev-test"},
 			wantErr: true,
 		},
 		{
 			name:    "missing sku",
-			config:  AzureConfig{Location: "eastus", Family: "C"},
+			config:  AzureConfig{Location: "eastus", Template: "dev-test"},
 			wantErr: true,
 		},
 		{
-			name:    "invalid capacity",
-			config:  AzureConfig{Location: "eastus", SKU: "Basic", Family: "C", Capacity: 10},
+			name:    "missing template",
+			config:  AzureConfig{Location: "eastus", SKU: "Balanced_B0"},
+			wantErr: true,
+		},
+		{
+			name:    "invalid SKU format",
+			config:  AzureConfig{Location: "eastus", SKU: "InvalidSKU", Template: "dev-test"},
 			wantErr: true,
 		},
 	}
@@ -180,9 +183,8 @@ func TestProfileClone(t *testing.T) {
 		Config: ProfileConfig{
 			Azure: &AzureConfig{
 				Location: "eastus",
-				SKU:      "Basic",
-				Family:   "C",
-				Capacity: 0,
+				SKU:      "Balanced_B0",
+				Template: "dev-test",
 			},
 		},
 	}
@@ -360,7 +362,7 @@ func TestStoreListByProvider(t *testing.T) {
 		Name:     "azure-test",
 		Provider: ProviderAzure,
 		Config: ProfileConfig{
-			Azure: &AzureConfig{Location: "eastus", SKU: "Basic", Family: "C"},
+			Azure: &AzureConfig{Location: "eastus", SKU: "Balanced_B0", Template: "dev-test"},
 		},
 	}
 	store.Create(ctx, azureProfile)

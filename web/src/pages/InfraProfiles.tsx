@@ -21,6 +21,8 @@ import {
   Divider,
   Upload,
   Alert,
+  Tabs,
+  Radio,
 } from 'antd';
 import {
   PlusOutlined,
@@ -36,6 +38,9 @@ import {
   ImportOutlined,
   QuestionCircleOutlined,
   LockOutlined,
+  GlobalOutlined,
+  ApiOutlined,
+  SafetyOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { UploadFile } from 'antd/es/upload/interface';
@@ -58,20 +63,140 @@ const providerOptions: { value: InfraProfileProvider; label: string; icon: React
   { value: 'custom', label: 'Custom', icon: <SettingOutlined style={{ color: '#faad14' }} /> },
 ];
 
-// Azure SKU options
-const azureSkuOptions = [
-  { value: 'Basic', label: 'Basic' },
-  { value: 'Standard', label: 'Standard' },
-  { value: 'Premium', label: 'Premium' },
-  { value: 'Enterprise', label: 'Enterprise' },
-  { value: 'EnterpriseFlash', label: 'Enterprise Flash' },
+// =============================================================================
+// AZURE MANAGED REDIS CONFIGURATION OPTIONS
+// =============================================================================
+
+// All Azure regions where AMR is available
+const azureRegions = [
+  // Americas
+  { value: 'eastus', label: 'East US', group: 'Americas' },
+  { value: 'eastus2', label: 'East US 2', group: 'Americas' },
+  { value: 'centralus', label: 'Central US', group: 'Americas' },
+  { value: 'northcentralus', label: 'North Central US', group: 'Americas' },
+  { value: 'southcentralus', label: 'South Central US', group: 'Americas' },
+  { value: 'westus', label: 'West US', group: 'Americas' },
+  { value: 'westus2', label: 'West US 2', group: 'Americas' },
+  { value: 'westus3', label: 'West US 3', group: 'Americas' },
+  { value: 'canadacentral', label: 'Canada Central', group: 'Americas' },
+  { value: 'canadaeast', label: 'Canada East', group: 'Americas' },
+  { value: 'brazilsouth', label: 'Brazil South', group: 'Americas' },
+  // Europe
+  { value: 'northeurope', label: 'North Europe', group: 'Europe' },
+  { value: 'westeurope', label: 'West Europe', group: 'Europe' },
+  { value: 'uksouth', label: 'UK South', group: 'Europe' },
+  { value: 'ukwest', label: 'UK West', group: 'Europe' },
+  { value: 'francecentral', label: 'France Central', group: 'Europe' },
+  { value: 'francesouth', label: 'France South', group: 'Europe' },
+  { value: 'germanywestcentral', label: 'Germany West Central', group: 'Europe' },
+  { value: 'switzerlandnorth', label: 'Switzerland North', group: 'Europe' },
+  { value: 'switzerlandwest', label: 'Switzerland West', group: 'Europe' },
+  { value: 'norwayeast', label: 'Norway East', group: 'Europe' },
+  { value: 'norwaywest', label: 'Norway West', group: 'Europe' },
+  { value: 'swedencentral', label: 'Sweden Central', group: 'Europe' },
+  { value: 'polandcentral', label: 'Poland Central', group: 'Europe' },
+  { value: 'italynorth', label: 'Italy North', group: 'Europe' },
+  // Asia Pacific
+  { value: 'eastasia', label: 'East Asia', group: 'Asia Pacific' },
+  { value: 'southeastasia', label: 'Southeast Asia', group: 'Asia Pacific' },
+  { value: 'australiaeast', label: 'Australia East', group: 'Asia Pacific' },
+  { value: 'australiasoutheast', label: 'Australia Southeast', group: 'Asia Pacific' },
+  { value: 'australiacentral', label: 'Australia Central', group: 'Asia Pacific' },
+  { value: 'japaneast', label: 'Japan East', group: 'Asia Pacific' },
+  { value: 'japanwest', label: 'Japan West', group: 'Asia Pacific' },
+  { value: 'koreacentral', label: 'Korea Central', group: 'Asia Pacific' },
+  { value: 'koreasouth', label: 'Korea South', group: 'Asia Pacific' },
+  { value: 'centralindia', label: 'Central India', group: 'Asia Pacific' },
+  { value: 'southindia', label: 'South India', group: 'Asia Pacific' },
+  { value: 'westindia', label: 'West India', group: 'Asia Pacific' },
+  // Middle East & Africa
+  { value: 'uaenorth', label: 'UAE North', group: 'Middle East & Africa' },
+  { value: 'uaecentral', label: 'UAE Central', group: 'Middle East & Africa' },
+  { value: 'southafricanorth', label: 'South Africa North', group: 'Middle East & Africa' },
+  { value: 'southafricawest', label: 'South Africa West', group: 'Middle East & Africa' },
+  { value: 'qatarcentral', label: 'Qatar Central', group: 'Middle East & Africa' },
+  { value: 'israelcentral', label: 'Israel Central', group: 'Middle East & Africa' },
 ];
 
-// Azure locations
-const azureLocations = [
-  'eastus', 'eastus2', 'westus', 'westus2', 'centralus',
-  'northeurope', 'westeurope', 'uksouth', 'ukwest',
-  'southeastasia', 'eastasia', 'japaneast', 'australiaeast',
+// In-memory SKUs - Balanced (general purpose)
+const balancedSkus = [
+  { value: 'Balanced_B0', label: 'Balanced B0', vcpus: 2, cacheGB: 0.5, description: 'Dev/Test' },
+  { value: 'Balanced_B1', label: 'Balanced B1', vcpus: 2, cacheGB: 1, description: '2 vCPUs, 1 GB' },
+  { value: 'Balanced_B3', label: 'Balanced B3', vcpus: 2, cacheGB: 3, description: '2 vCPUs, 3 GB' },
+  { value: 'Balanced_B5', label: 'Balanced B5', vcpus: 2, cacheGB: 6, description: '2 vCPUs, 6 GB' },
+  { value: 'Balanced_B10', label: 'Balanced B10', vcpus: 4, cacheGB: 12, description: '4 vCPUs, 12 GB' },
+  { value: 'Balanced_B20', label: 'Balanced B20', vcpus: 4, cacheGB: 24, description: '4 vCPUs, 24 GB' },
+  { value: 'Balanced_B50', label: 'Balanced B50', vcpus: 8, cacheGB: 48, description: '8 vCPUs, 48 GB' },
+  { value: 'Balanced_B100', label: 'Balanced B100', vcpus: 16, cacheGB: 96, description: '16 vCPUs, 96 GB' },
+  { value: 'Balanced_B150', label: 'Balanced B150', vcpus: 24, cacheGB: 144, description: '24 vCPUs, 144 GB' },
+  { value: 'Balanced_B250', label: 'Balanced B250', vcpus: 32, cacheGB: 192, description: '32 vCPUs, 192 GB' },
+  { value: 'Balanced_B350', label: 'Balanced B350', vcpus: 48, cacheGB: 288, description: '48 vCPUs, 288 GB' },
+  { value: 'Balanced_B500', label: 'Balanced B500', vcpus: 64, cacheGB: 384, description: '64 vCPUs, 384 GB' },
+  { value: 'Balanced_B700', label: 'Balanced B700', vcpus: 80, cacheGB: 512, description: '80 vCPUs, 512 GB' },
+  { value: 'Balanced_B1000', label: 'Balanced B1000', vcpus: 112, cacheGB: 672, description: '112 vCPUs, 672 GB' },
+];
+
+// In-memory SKUs - Memory Optimized
+const memoryOptimizedSkus = [
+  { value: 'MemoryOptimized_M10', label: 'Memory M10', vcpus: 2, cacheGB: 32, description: '2 vCPUs, 32 GB' },
+  { value: 'MemoryOptimized_M20', label: 'Memory M20', vcpus: 4, cacheGB: 64, description: '4 vCPUs, 64 GB' },
+  { value: 'MemoryOptimized_M50', label: 'Memory M50', vcpus: 8, cacheGB: 128, description: '8 vCPUs, 128 GB' },
+  { value: 'MemoryOptimized_M100', label: 'Memory M100', vcpus: 16, cacheGB: 256, description: '16 vCPUs, 256 GB' },
+  { value: 'MemoryOptimized_M150', label: 'Memory M150', vcpus: 24, cacheGB: 384, description: '24 vCPUs, 384 GB' },
+  { value: 'MemoryOptimized_M250', label: 'Memory M250', vcpus: 32, cacheGB: 512, description: '32 vCPUs, 512 GB' },
+  { value: 'MemoryOptimized_M350', label: 'Memory M350', vcpus: 48, cacheGB: 672, description: '48 vCPUs, 672 GB' },
+  { value: 'MemoryOptimized_M500', label: 'Memory M500', vcpus: 64, cacheGB: 896, description: '64 vCPUs, 896 GB' },
+  { value: 'MemoryOptimized_M700', label: 'Memory M700', vcpus: 80, cacheGB: 1024, description: '80 vCPUs, 1 TB' },
+  { value: 'MemoryOptimized_M1000', label: 'Memory M1000', vcpus: 112, cacheGB: 1408, description: '112 vCPUs, 1.4 TB' },
+];
+
+// In-memory SKUs - Compute Optimized
+const computeOptimizedSkus = [
+  { value: 'ComputeOptimized_X3', label: 'Compute X3', vcpus: 2, cacheGB: 3, description: '2 vCPUs, 3 GB' },
+  { value: 'ComputeOptimized_X5', label: 'Compute X5', vcpus: 4, cacheGB: 6, description: '4 vCPUs, 6 GB' },
+  { value: 'ComputeOptimized_X10', label: 'Compute X10', vcpus: 8, cacheGB: 12, description: '8 vCPUs, 12 GB' },
+  { value: 'ComputeOptimized_X20', label: 'Compute X20', vcpus: 16, cacheGB: 24, description: '16 vCPUs, 24 GB' },
+  { value: 'ComputeOptimized_X50', label: 'Compute X50', vcpus: 32, cacheGB: 48, description: '32 vCPUs, 48 GB' },
+  { value: 'ComputeOptimized_X100', label: 'Compute X100', vcpus: 64, cacheGB: 96, description: '64 vCPUs, 96 GB' },
+  { value: 'ComputeOptimized_X150', label: 'Compute X150', vcpus: 96, cacheGB: 144, description: '96 vCPUs, 144 GB' },
+  { value: 'ComputeOptimized_X250', label: 'Compute X250', vcpus: 128, cacheGB: 192, description: '128 vCPUs, 192 GB' },
+  { value: 'ComputeOptimized_X350', label: 'Compute X350', vcpus: 176, cacheGB: 288, description: '176 vCPUs, 288 GB' },
+  { value: 'ComputeOptimized_X500', label: 'Compute X500', vcpus: 256, cacheGB: 384, description: '256 vCPUs, 384 GB' },
+  { value: 'ComputeOptimized_X700', label: 'Compute X700', vcpus: 320, cacheGB: 512, description: '320 vCPUs, 512 GB' },
+];
+
+// Flash SKUs
+const flashOptimizedSkus = [
+  { value: 'FlashOptimized_F300', label: 'Flash F300', vcpus: 6, cacheGB: 345, description: '6 vCPUs, ~345 GB usable' },
+  { value: 'FlashOptimized_F700', label: 'Flash F700', vcpus: 12, cacheGB: 715, description: '12 vCPUs, ~715 GB usable' },
+  { value: 'FlashOptimized_F1500', label: 'Flash F1500', vcpus: 24, cacheGB: 1455, description: '24 vCPUs, ~1.4 TB usable' },
+];
+
+// Eviction policies
+const evictionPolicies = [
+  { value: 'noeviction', label: 'No Eviction', description: 'Return error when memory limit reached' },
+  { value: 'allkeys-lru', label: 'All Keys - LRU', description: 'Evict any key using approximated LRU' },
+  { value: 'allkeys-lfu', label: 'All Keys - LFU', description: 'Evict any key using approximated LFU' },
+  { value: 'volatile-lru', label: 'Volatile - LRU', description: 'Evict keys with TTL using approximated LRU' },
+  { value: 'volatile-lfu', label: 'Volatile - LFU', description: 'Evict keys with TTL using approximated LFU' },
+  { value: 'allkeys-random', label: 'All Keys - Random', description: 'Evict any key randomly' },
+  { value: 'volatile-random', label: 'Volatile - Random', description: 'Evict keys with TTL randomly' },
+  { value: 'volatile-ttl', label: 'Volatile - TTL', description: 'Evict keys with nearest TTL' },
+];
+
+// Clustering policies
+const clusteringPolicies = [
+  { value: 'non-clustered', label: 'Non-clustered', description: 'Single Redis instance' },
+  { value: 'oss', label: 'OSS', description: 'Redis Cluster (OSS Cluster API)' },
+  { value: 'enterprise', label: 'Enterprise', description: 'Enterprise clustering' },
+];
+
+// Redis modules available
+const redisModules = [
+  { value: 'RediSearch', label: 'RediSearch', description: 'Full-text search and secondary indexing' },
+  { value: 'RedisJSON', label: 'RedisJSON', description: 'Native JSON data type' },
+  { value: 'RedisBloom', label: 'RedisBloom', description: 'Bloom filters and probabilistic data structures' },
+  { value: 'RedisTimeSeries', label: 'RedisTimeSeries', description: 'Time-series data structure' },
 ];
 
 // AWS regions
@@ -148,8 +273,7 @@ export default function InfraProfiles() {
       config: {
         azure: {
           location: 'eastus',
-          sku: 'Standard',
-          capacity: 1,
+          sku: 'Balanced_B0',
         },
       },
     });
@@ -318,7 +442,7 @@ export default function InfraProfiles() {
     switch (profile.provider) {
       case 'azure':
         if (config.azure) {
-          return `${config.azure.location} • ${config.azure.sku} • ${config.azure.capacity} capacity`;
+          return `${config.azure.location} • ${config.azure.sku}`;
         }
         break;
       case 'aws':
@@ -444,127 +568,513 @@ export default function InfraProfiles() {
     switch (selectedProvider) {
       case 'azure':
         return (
-          <>
-            <Divider orientation="left">Azure Redis Cache Configuration</Divider>
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-                  name={['config', 'azure', 'location']}
-                  label="Location"
-                  rules={[{ required: true }]}
-                >
-                  <Select
-                    placeholder="Select location"
-                    showSearch
-                    options={azureLocations.map((loc) => ({ value: loc, label: loc }))}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  name={['config', 'azure', 'sku']}
-                  label="SKU"
-                  rules={[{ required: true }]}
-                >
-                  <Select placeholder="Select SKU" options={azureSkuOptions} />
-                </Form.Item>
-              </Col>
-            </Row>
-            <Row gutter={16}>
-              <Col span={8}>
-                <Form.Item
-                  name={['config', 'azure', 'capacity']}
-                  label="Capacity"
-                  rules={[{ required: true }]}
-                >
-                  <InputNumber min={1} max={10} style={{ width: '100%' }} />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item name={['config', 'azure', 'family']} label="Family">
-                  <Select
-                    placeholder="Auto"
-                    allowClear
-                    options={[
-                      { value: 'C', label: 'C (Basic/Standard)' },
-                      { value: 'P', label: 'P (Premium)' },
-                    ]}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item name={['config', 'azure', 'shard_count']} label="Shard Count">
-                  <InputNumber min={1} max={10} placeholder="1" style={{ width: '100%' }} />
-                </Form.Item>
-              </Col>
-            </Row>
-            <Row gutter={16}>
-              <Col span={8}>
-                <Form.Item name={['config', 'azure', 'redis_version']} label="Redis Version">
-                  <Select
-                    placeholder="Latest"
-                    allowClear
-                    options={[
-                      { value: '6', label: '6.x' },
-                      { value: '4', label: '4.x' },
-                    ]}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item name={['config', 'azure', 'minimum_tls_version']} label="Min TLS">
-                  <Select
-                    placeholder="1.2"
-                    options={[
-                      { value: '1.0', label: 'TLS 1.0' },
-                      { value: '1.1', label: 'TLS 1.1' },
-                      { value: '1.2', label: 'TLS 1.2' },
-                    ]}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item
-                  name={['config', 'azure', 'enable_non_ssl_port']}
-                  label="Non-SSL Port"
-                  valuePropName="checked"
-                >
-                  <Switch />
-                </Form.Item>
-              </Col>
-            </Row>
-            <Divider orientation="left">Benchmark VM Configuration</Divider>
-            <Row gutter={16}>
-              <Col span={8}>
-                <Form.Item name={['config', 'azure', 'vm_size']} label="VM Size">
-                  <Select
-                    placeholder="Standard_D2s_v3"
-                    allowClear
-                    options={[
-                      { value: 'Standard_D2s_v3', label: 'D2s v3 (2 vCPU, 8GB)' },
-                      { value: 'Standard_D4s_v3', label: 'D4s v3 (4 vCPU, 16GB)' },
-                      { value: 'Standard_D8s_v3', label: 'D8s v3 (8 vCPU, 32GB)' },
-                      { value: 'Standard_F4s_v2', label: 'F4s v2 (4 vCPU, 8GB)' },
-                    ]}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item name={['config', 'azure', 'vm_count']} label="VM Count">
-                  <InputNumber min={1} max={10} placeholder="1" style={{ width: '100%' }} />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item
-                  name={['config', 'azure', 'use_spot_vms']}
-                  label="Use Spot VMs"
-                  valuePropName="checked"
-                >
-                  <Switch />
-                </Form.Item>
-              </Col>
-            </Row>
-          </>
+          <Tabs
+            defaultActiveKey="basics"
+            items={[
+              {
+                key: 'basics',
+                label: (
+                  <span>
+                    <CloudOutlined /> Basics
+                  </span>
+                ),
+                children: (
+                  <>
+                    <Alert
+                      message="Azure Managed Redis (AMR)"
+                      description="Configure your Azure Managed Redis instance. This creates a high-performance Redis cache in Azure."
+                      type="info"
+                      showIcon
+                      style={{ marginBottom: 16 }}
+                    />
+                    <Divider orientation="left">Instance Details</Divider>
+                    <Row gutter={16}>
+                      <Col span={12}>
+                        <Form.Item
+                          name={['config', 'azure', 'instance_name']}
+                          label="Name"
+                          tooltip="Instance name (will be: <name>.<region>.redis.azure.net)"
+                        >
+                          <Input placeholder="my-redis-instance" addonAfter=".redis.azure.net" />
+                        </Form.Item>
+                      </Col>
+                      <Col span={12}>
+                        <Form.Item
+                          name={['config', 'azure', 'location']}
+                          label="Region"
+                          rules={[{ required: true, message: 'Please select a region' }]}
+                        >
+                          <Select
+                            placeholder="Select region"
+                            showSearch
+                            optionFilterProp="label"
+                            options={azureRegions.map((r) => ({
+                              value: r.value,
+                              label: `${r.label} (${r.value})`,
+                            }))}
+                          />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                    <Divider orientation="left">Performance Tier</Divider>
+                    <Paragraph type="secondary" style={{ marginBottom: 16 }}>
+                      In-memory tiers use RAM for high-performance caching. Flash tier uses both RAM and SSD for very large datasets.
+                    </Paragraph>
+                    <Form.Item
+                      name={['config', 'azure', 'data_tier']}
+                      label="Data Tier"
+                      initialValue="in-memory"
+                    >
+                      <Radio.Group
+                        onChange={(e) => {
+                          // Reset SKU when data tier changes
+                          const newTier = e.target.value;
+                          const defaultSku = newTier === 'flash' ? 'FlashOptimized_F300' : 'Balanced_B0';
+                          form.setFieldValue(['config', 'azure', 'sku'], defaultSku);
+                        }}
+                      >
+                        <Radio.Button value="in-memory">
+                          <strong>In-memory</strong> (Recommended)
+                          <br />
+                          <Text type="secondary" style={{ fontSize: 12 }}>High-performance caches powered by Redis</Text>
+                        </Radio.Button>
+                        <Radio.Button value="flash">
+                          <strong>Flash</strong>
+                          <br />
+                          <Text type="secondary" style={{ fontSize: 12 }}>Lower performance, intended for very large datasets</Text>
+                        </Radio.Button>
+                      </Radio.Group>
+                    </Form.Item>
+                    <Form.Item
+                      noStyle
+                      shouldUpdate={(prevValues, currentValues) =>
+                        prevValues?.config?.azure?.data_tier !== currentValues?.config?.azure?.data_tier
+                      }
+                    >
+                      {({ getFieldValue }) => {
+                        const dataTier = getFieldValue(['config', 'azure', 'data_tier']) || 'in-memory';
+                        const allSkus = dataTier === 'flash'
+                          ? flashOptimizedSkus
+                          : [...balancedSkus, ...memoryOptimizedSkus, ...computeOptimizedSkus];
+                        
+                        return (
+                          <Form.Item
+                            name={['config', 'azure', 'sku']}
+                            label="Performance (SKU)"
+                            rules={[{ required: true, message: 'Please select SKU' }]}
+                            tooltip="Determines vCPUs and memory allocation"
+                          >
+                            <Select
+                              placeholder="Select performance tier"
+                              showSearch
+                              optionFilterProp="label"
+                              options={allSkus.map((sku) => ({
+                                value: sku.value,
+                                label: `${sku.label} - ${sku.description}`,
+                              }))}
+                            />
+                          </Form.Item>
+                        );
+                      }}
+                    </Form.Item>
+                  </>
+                ),
+              },
+              {
+                key: 'networking',
+                label: (
+                  <span>
+                    <GlobalOutlined /> Networking
+                  </span>
+                ),
+                children: (
+                  <>
+                    <Divider orientation="left">Network Access</Divider>
+                    <Paragraph type="secondary" style={{ marginBottom: 16 }}>
+                      Enable access to the Redis instance either publicly using a public IP address or privately using Private Endpoints.
+                    </Paragraph>
+                    <Form.Item
+                      name={['config', 'azure', 'use_private_endpoint']}
+                      label="Network Access"
+                      initialValue={true}
+                    >
+                      <Radio.Group>
+                        <Space direction="vertical">
+                          <Radio value={true}>
+                            <strong>Disable public access and use private access</strong>
+                            <br />
+                            <Text type="secondary">A Private Endpoint is required to reach the instance from within your virtual network.</Text>
+                          </Radio>
+                          <Radio value={false}>
+                            <strong>Enable public access from all networks</strong>
+                            <br />
+                            <Text type="secondary">Easier to connect, but exposes a public endpoint. Review security posture before enabling.</Text>
+                          </Radio>
+                        </Space>
+                      </Radio.Group>
+                    </Form.Item>
+                  </>
+                ),
+              },
+              {
+                key: 'geo-replication',
+                label: (
+                  <span>
+                    <ApiOutlined /> Active Geo-Replication
+                  </span>
+                ),
+                children: (
+                  <>
+                    <Divider orientation="left">Active Geo-Replication</Divider>
+                    <Paragraph type="secondary" style={{ marginBottom: 16 }}>
+                      Azure active geo-replication keeps your cache synchronized for high availability and minimal downtime.
+                      It must be enabled during provisioning—caches without it cannot be added to or join active geo-replication groups later.
+                    </Paragraph>
+                    <Form.Item
+                      name={['config', 'azure', 'active_geo_replication']}
+                      label="Enable Geo-Replication"
+                      valuePropName="checked"
+                    >
+                      <Switch />
+                    </Form.Item>
+                    <Form.Item
+                      name={['config', 'azure', 'geo_replication_group_name']}
+                      label="Geo-Replication Group Name"
+                      tooltip="Name of the geo-replication group to create or join"
+                    >
+                      <Input placeholder="my-geo-group" />
+                    </Form.Item>
+                  </>
+                ),
+              },
+              {
+                key: 'advanced',
+                label: (
+                  <span>
+                    <SafetyOutlined /> Advanced
+                  </span>
+                ),
+                children: (
+                  <>
+                    <Divider orientation="left">Modules</Divider>
+                    <Form.Item
+                      name={['config', 'azure', 'modules']}
+                      label="Redis Modules"
+                      tooltip="Enable additional Redis data structures and capabilities"
+                    >
+                      <Select
+                        mode="multiple"
+                        placeholder="Select modules"
+                        allowClear
+                        options={redisModules.map((m) => ({
+                          value: m.value,
+                          label: `${m.label} - ${m.description}`,
+                        }))}
+                      />
+                    </Form.Item>
+                    
+                    <Divider orientation="left">Redis Settings</Divider>
+                    <Row gutter={16}>
+                      <Col span={12}>
+                        <Form.Item
+                          name={['config', 'azure', 'eviction_policy']}
+                          label="Eviction Policy"
+                          tooltip="How Redis handles memory pressure"
+                          initialValue="noeviction"
+                        >
+                          <Select
+                            placeholder="Select eviction policy"
+                            options={evictionPolicies.map((p) => ({
+                              value: p.value,
+                              label: p.label,
+                              title: p.description,
+                            }))}
+                          />
+                        </Form.Item>
+                      </Col>
+                      <Col span={12}>
+                        <Form.Item
+                          name={['config', 'azure', 'clustering_policy']}
+                          label="Clustering Policy"
+                          tooltip="Client connection mode"
+                          initialValue="oss"
+                        >
+                          <Select
+                            placeholder="Select clustering policy"
+                            options={clusteringPolicies.map((p) => ({
+                              value: p.value,
+                              label: `${p.label} - ${p.description}`,
+                            }))}
+                          />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                    <Row gutter={16}>
+                      <Col span={8}>
+                        <Form.Item
+                          name={['config', 'azure', 'high_availability']}
+                          label="High Availability"
+                          valuePropName="checked"
+                          tooltip="Zone redundancy for high availability"
+                          initialValue={true}
+                        >
+                          <Switch />
+                        </Form.Item>
+                      </Col>
+                      <Col span={8}>
+                        <Form.Item
+                          name={['config', 'azure', 'non_tls_access_only']}
+                          label="Non-TLS Access"
+                          valuePropName="checked"
+                          tooltip="Allow non-TLS (unencrypted) connections"
+                        >
+                          <Switch />
+                        </Form.Item>
+                      </Col>
+                      <Col span={8}>
+                        <Form.Item
+                          name={['config', 'azure', 'access_keys_auth']}
+                          label="Access Key Auth"
+                          valuePropName="checked"
+                          tooltip="Enable access key authentication"
+                        >
+                          <Switch />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                    
+                    <Divider orientation="left">Data Persistence (Preview)</Divider>
+                    <Paragraph type="secondary" style={{ marginBottom: 16 }}>
+                      Data persistence allows you to persist data stored in Redis. You can take snapshots or write to an append-only file to back up the data which you can load in case of a failure.
+                    </Paragraph>
+                    <Form.Item
+                      name={['config', 'azure', 'persistence_type']}
+                      label="Backup File"
+                      initialValue=""
+                    >
+                      <Radio.Group>
+                        <Space direction="vertical">
+                          <Radio value="">No Persistence</Radio>
+                          <Radio value="rdb">Redis Database (RDB)</Radio>
+                          <Radio value="aof">Append-only file (AOF)</Radio>
+                        </Space>
+                      </Radio.Group>
+                    </Form.Item>
+                    <Form.Item
+                      noStyle
+                      shouldUpdate={(prevValues, currentValues) =>
+                        prevValues?.config?.azure?.persistence_type !== currentValues?.config?.azure?.persistence_type
+                      }
+                    >
+                      {({ getFieldValue }) => {
+                        const persistenceType = getFieldValue(['config', 'azure', 'persistence_type']);
+                        
+                        if (persistenceType === 'rdb') {
+                          return (
+                            <Form.Item
+                              name={['config', 'azure', 'rdb_frequency']}
+                              label="RDB Snapshot Frequency"
+                              tooltip="How often to create RDB snapshots"
+                              initialValue="1h"
+                            >
+                              <Select
+                                placeholder="Select frequency"
+                                options={[
+                                  { value: '1h', label: 'Every 1 hour' },
+                                  { value: '6h', label: 'Every 6 hours' },
+                                  { value: '12h', label: 'Every 12 hours' },
+                                ]}
+                              />
+                            </Form.Item>
+                          );
+                        }
+                        
+                        if (persistenceType === 'aof') {
+                          return (
+                            <Form.Item
+                              name={['config', 'azure', 'aof_frequency']}
+                              label="AOF Sync Frequency"
+                              tooltip="How often to sync AOF to disk"
+                              initialValue="1s"
+                            >
+                              <Select
+                                placeholder="Select frequency"
+                                options={[
+                                  { value: '1s', label: 'Every second (fsync every second)' },
+                                  { value: 'always', label: 'Always (fsync on every write)' },
+                                ]}
+                              />
+                            </Form.Item>
+                          );
+                        }
+                        
+                        return null;
+                      }}
+                    </Form.Item>
+                    
+                    <Divider orientation="left">Encryption & Updates</Divider>
+                    <Row gutter={16}>
+                      <Col span={12}>
+                        <Form.Item
+                          name={['config', 'azure', 'customer_managed_key']}
+                          label="Customer-managed Key"
+                          valuePropName="checked"
+                          tooltip="Use a customer-managed key for encryption at rest"
+                        >
+                          <Switch />
+                        </Form.Item>
+                      </Col>
+                      <Col span={12}>
+                        <Form.Item
+                          name={['config', 'azure', 'defer_version_updates']}
+                          label="Defer Version Updates"
+                          valuePropName="checked"
+                          tooltip="Defer automatic major Redis version updates (Preview)"
+                        >
+                          <Switch />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                    <Form.Item
+                      noStyle
+                      shouldUpdate={(prevValues, currentValues) =>
+                        prevValues?.config?.azure?.customer_managed_key !== currentValues?.config?.azure?.customer_managed_key ||
+                        prevValues?.config?.azure?.key_input_method !== currentValues?.config?.azure?.key_input_method
+                      }
+                    >
+                      {({ getFieldValue }) => {
+                        const cmkEnabled = getFieldValue(['config', 'azure', 'customer_managed_key']);
+                        
+                        if (!cmkEnabled) return null;
+                        
+                        const keyInputMethod = getFieldValue(['config', 'azure', 'key_input_method']) || 'select';
+                        
+                        return (
+                          <>
+                            <Alert
+                              message="Select identity and key"
+                              description="A user-assigned managed identity is required with Key Vault Crypto User permissions on the selected key vault."
+                              type="info"
+                              showIcon
+                              style={{ marginBottom: 16 }}
+                            />
+                            
+                            <Form.Item
+                              name={['config', 'azure', 'user_assigned_identity_id']}
+                              label="Select user assigned managed identity"
+                              rules={[{ required: cmkEnabled, message: 'User-assigned managed identity is required' }]}
+                              tooltip="Resource ID of the user-assigned managed identity with Key Vault Crypto User permissions"
+                            >
+                              <Input placeholder="/subscriptions/{sub-id}/resourceGroups/{rg}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/{name}" />
+                            </Form.Item>
+                            
+                            <Form.Item
+                              name={['config', 'azure', 'key_input_method']}
+                              label="Key input method"
+                              initialValue="select"
+                              tooltip="Choose how to specify the encryption key"
+                            >
+                              <Radio.Group>
+                                <Space direction="vertical">
+                                  <Radio value="select">Select Azure key vault and key</Radio>
+                                  <Radio value="uri">Enter key from URI</Radio>
+                                </Space>
+                              </Radio.Group>
+                            </Form.Item>
+                            
+                            {keyInputMethod === 'select' ? (
+                              <>
+                                <Form.Item
+                                  name={['config', 'azure', 'key_vault_subscription_id']}
+                                  label="Subscription"
+                                  tooltip="Azure subscription containing the Key Vault"
+                                >
+                                  <Input placeholder="Enter subscription ID (e.g., 12345678-1234-1234-1234-123456789abc)" />
+                                </Form.Item>
+                                <Form.Item
+                                  name={['config', 'azure', 'key_vault_name']}
+                                  label="Key vault"
+                                  rules={[{ required: cmkEnabled && keyInputMethod === 'select', message: 'Key Vault name is required' }]}
+                                  tooltip="Name of the Azure Key Vault"
+                                >
+                                  <Input placeholder="my-keyvault" />
+                                </Form.Item>
+                                <Form.Item
+                                  name={['config', 'azure', 'key_name']}
+                                  label="Customer-managed key (RSA)"
+                                  rules={[{ required: cmkEnabled && keyInputMethod === 'select', message: 'Key name is required' }]}
+                                  tooltip="Name of the RSA key in the Key Vault"
+                                >
+                                  <Input placeholder="redis-encryption-key" />
+                                </Form.Item>
+                                <Form.Item
+                                  name={['config', 'azure', 'key_version']}
+                                  label="Version"
+                                  tooltip="Optional: specific key version (leave empty for latest)"
+                                >
+                                  <Input placeholder="Leave empty for latest version" />
+                                </Form.Item>
+                              </>
+                            ) : (
+                              <Form.Item
+                                name={['config', 'azure', 'key_identifier_uri']}
+                                label="Key Identifier URI"
+                                rules={[{ required: cmkEnabled && keyInputMethod === 'uri', message: 'Key Identifier URI is required' }]}
+                                tooltip="Full URI to the key, e.g., https://myvault.vault.azure.net/keys/mykey/abc123..."
+                              >
+                                <Input placeholder="https://myvault.vault.azure.net/keys/redis-key/abc123def456..." />
+                              </Form.Item>
+                            )}
+                          </>
+                        );
+                      }}
+                    </Form.Item>
+                  </>
+                ),
+              },
+              {
+                key: 'benchmark-vm',
+                label: (
+                  <span>
+                    <DesktopOutlined /> Benchmark VM
+                  </span>
+                ),
+                children: (
+                  <>
+                    <Divider orientation="left">Benchmark VM Configuration</Divider>
+                    <Paragraph type="secondary" style={{ marginBottom: 16 }}>
+                      Configure the virtual machine that will run memtier_benchmark against your Redis instance.
+                    </Paragraph>
+                    <Row gutter={16}>
+                      <Col span={12}>
+                        <Form.Item name={['config', 'azure', 'vm_size']} label="VM Size">
+                          <Select
+                            placeholder="Standard_D2s_v3"
+                            allowClear
+                            options={[
+                              { value: 'Standard_B2s', label: 'B2s (2 vCPU, 4GB) - Burstable' },
+                              { value: 'Standard_D2s_v3', label: 'D2s v3 (2 vCPU, 8GB)' },
+                              { value: 'Standard_D4s_v3', label: 'D4s v3 (4 vCPU, 16GB)' },
+                              { value: 'Standard_D8s_v3', label: 'D8s v3 (8 vCPU, 32GB)' },
+                              { value: 'Standard_D16s_v3', label: 'D16s v3 (16 vCPU, 64GB)' },
+                              { value: 'Standard_F4s_v2', label: 'F4s v2 (4 vCPU, 8GB) - Compute' },
+                              { value: 'Standard_F8s_v2', label: 'F8s v2 (8 vCPU, 16GB) - Compute' },
+                              { value: 'Standard_F16s_v2', label: 'F16s v2 (16 vCPU, 32GB) - Compute' },
+                            ]}
+                          />
+                        </Form.Item>
+                      </Col>
+                      <Col span={12}>
+                        <Form.Item name={['config', 'azure', 'vm_count']} label="VM Count">
+                          <InputNumber min={1} max={10} placeholder="1" style={{ width: '100%' }} />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                  </>
+                ),
+              },
+            ]}
+          />
         );
 
       case 'aws':
@@ -1012,7 +1522,7 @@ export default function InfraProfiles() {
           initialValues={{
             provider: 'azure',
             config: {
-              azure: { location: 'eastus', sku: 'Standard', capacity: 1 },
+              azure: { location: 'eastus', sku: 'Balanced_B0' },
             },
           }}
         >

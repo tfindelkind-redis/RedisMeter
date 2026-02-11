@@ -197,22 +197,26 @@ func (c *Comparator) compareEnvironments(env1, env2 *domain.Environment) (bool, 
 	var diffs []string
 
 	// Compare host info
-	if env1.Hostname != env2.Hostname {
-		diffs = append(diffs, fmt.Sprintf("hostname: %s vs %s", env1.Hostname, env2.Hostname))
-	}
-	if env1.OS != env2.OS {
-		diffs = append(diffs, fmt.Sprintf("os: %s vs %s", env1.OS, env2.OS))
-	}
-	if env1.CPUCores != env2.CPUCores {
-		diffs = append(diffs, fmt.Sprintf("cpu_cores: %d vs %d", env1.CPUCores, env2.CPUCores))
-	}
-	if env1.MemoryGB != env2.MemoryGB {
-		diffs = append(diffs, fmt.Sprintf("memory_gb: %.1f vs %.1f", env1.MemoryGB, env2.MemoryGB))
+	if env1.Host != nil && env2.Host != nil {
+		if env1.Host.Hostname != env2.Host.Hostname {
+			diffs = append(diffs, fmt.Sprintf("hostname: %s vs %s", env1.Host.Hostname, env2.Host.Hostname))
+		}
+		if env1.Host.OS != env2.Host.OS {
+			diffs = append(diffs, fmt.Sprintf("os: %s vs %s", env1.Host.OS, env2.Host.OS))
+		}
+		if env1.Host.CPUs != env2.Host.CPUs {
+			diffs = append(diffs, fmt.Sprintf("cpu_cores: %d vs %d", env1.Host.CPUs, env2.Host.CPUs))
+		}
+		if env1.Host.MemoryGB != env2.Host.MemoryGB {
+			diffs = append(diffs, fmt.Sprintf("memory_gb: %.1f vs %.1f", env1.Host.MemoryGB, env2.Host.MemoryGB))
+		}
 	}
 
 	// Compare Redis info
-	if env1.RedisVersion != env2.RedisVersion {
-		diffs = append(diffs, fmt.Sprintf("redis_version: %s vs %s", env1.RedisVersion, env2.RedisVersion))
+	if env1.Redis != nil && env2.Redis != nil {
+		if env1.Redis.Version != env2.Redis.Version {
+			diffs = append(diffs, fmt.Sprintf("redis_version: %s vs %s", env1.Redis.Version, env2.Redis.Version))
+		}
 	}
 
 	return len(diffs) == 0, diffs

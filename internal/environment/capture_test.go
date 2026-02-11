@@ -22,56 +22,56 @@ func TestCapture(t *testing.T) {
 
 	// Basic validation
 	t.Run("OS", func(t *testing.T) {
-		if env.OS == "" {
+		if env.Host == nil || env.Host.OS == "" {
 			t.Error("OS should not be empty")
 		}
 		// Should be darwin, linux, or windows
 		validOS := []string{"darwin", "linux", "windows"}
 		found := false
 		for _, os := range validOS {
-			if env.OS == os {
+			if env.Host.OS == os {
 				found = true
 				break
 			}
 		}
 		if !found {
-			t.Logf("Unexpected OS: %s", env.OS)
+			t.Logf("Unexpected OS: %s", env.Host.OS)
 		}
 	})
 
 	t.Run("Arch", func(t *testing.T) {
-		if env.Arch == "" {
+		if env.Host == nil || env.Host.Arch == "" {
 			t.Error("Arch should not be empty")
 		}
 		// Common architectures
 		validArch := []string{"amd64", "arm64", "386", "arm"}
 		found := false
 		for _, arch := range validArch {
-			if env.Arch == arch {
+			if env.Host.Arch == arch {
 				found = true
 				break
 			}
 		}
 		if !found {
-			t.Logf("Unexpected Arch: %s", env.Arch)
+			t.Logf("Unexpected Arch: %s", env.Host.Arch)
 		}
 	})
 
 	t.Run("Hostname", func(t *testing.T) {
-		if env.Hostname == "" {
+		if env.Host == nil || env.Host.Hostname == "" {
 			t.Error("Hostname should not be empty")
 		}
 	})
 
 	t.Run("CPUCount", func(t *testing.T) {
-		if env.CPUCores <= 0 {
-			t.Errorf("CPUCores = %d, should be > 0", env.CPUCores)
+		if env.Host == nil || env.Host.CPUs <= 0 {
+			t.Errorf("CPUs = %d, should be > 0", env.Host.CPUs)
 		}
 	})
 
 	t.Run("TotalMemory", func(t *testing.T) {
-		if env.MemoryGB <= 0 {
-			t.Errorf("MemoryGB = %f, should be > 0", env.MemoryGB)
+		if env.Host == nil || env.Host.MemoryGB <= 0 {
+			t.Errorf("MemoryGB = %f, should be > 0", env.Host.MemoryGB)
 		}
 	})
 
@@ -101,10 +101,10 @@ func TestCaptureWithInvalidRedis(t *testing.T) {
 	}
 
 	// Should still have basic system info
-	if env.OS == "" {
+	if env.Host == nil || env.Host.OS == "" {
 		t.Error("OS should not be empty even with invalid Redis")
 	}
-	if env.Hostname == "" {
+	if env.Host == nil || env.Host.Hostname == "" {
 		t.Error("Hostname should not be empty even with invalid Redis")
 	}
 }
@@ -147,8 +147,8 @@ func TestCapturedMetadata(t *testing.T) {
 
 	t.Run("CPUModel", func(t *testing.T) {
 		// CPU model may or may not be available
-		if env.CPUModel != "" {
-			t.Logf("CPU Model: %s", env.CPUModel)
+		if env.Host != nil && env.Host.CPUModel != "" {
+			t.Logf("CPU Model: %s", env.Host.CPUModel)
 		}
 	})
 
@@ -161,25 +161,29 @@ func TestCapturedMetadata(t *testing.T) {
 
 	t.Run("RedisVersion", func(t *testing.T) {
 		// Redis version should be captured if Redis is running
-		if env.RedisVersion != "" {
-			if !strings.Contains(env.RedisVersion, ".") {
-				t.Errorf("RedisVersion = %q, doesn't look like a version", env.RedisVersion)
+		if env.Redis != nil && env.Redis.Version != "" {
+			if !strings.Contains(env.Redis.Version, ".") {
+				t.Errorf("RedisVersion = %q, doesn't look like a version", env.Redis.Version)
 			}
-			t.Logf("Redis Version: %s", env.RedisVersion)
+			t.Logf("Redis Version: %s", env.Redis.Version)
 		}
 	})
 }
 
 func TestEnvironmentString(t *testing.T) {
 	env := &domain.Environment{
-		OS:           "darwin",
-		Arch:         "arm64",
-		Hostname:     "test-host",
-		CPUCores:     8,
-		CPUModel:     "Apple M1",
-		MemoryGB:     16,
-		RedisVersion: "7.0.0",
-		Fingerprint:  "abc123",
+		Host: &domain.HostInfo{
+			OS:       "darwin",
+			Arch:     "arm64",
+			Hostname: "test-host",
+			CPUs:     8,
+			CPUModel: "Apple M1",
+			MemoryGB: 16,
+		},
+		Redis: &domain.RedisInfo{
+			Version: "7.0.0",
+		},
+		Fingerprint: "abc123",
 	}
 
 	// Verify the environment can be formatted
@@ -199,5 +203,8 @@ func TestEnvironmentString(t *testing.T) {
 
 // Helper function to format environment for display
 func formatEnvironment(env *domain.Environment) string {
-	return env.OS + "/" + env.Arch + " " + env.Hostname
+	if env.Host == nil {
+		return ""
+	}
+	return env.Host.OS + "/" + env.Host.Arch + " " + env.Host.Hostname
 }

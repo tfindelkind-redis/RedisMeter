@@ -20,6 +20,7 @@ import {
   Tooltip,
   Empty,
   Collapse,
+  Tabs,
 } from 'antd';
 import {
   PlusOutlined,
@@ -31,6 +32,7 @@ import {
   RocketOutlined,
   ThunderboltOutlined,
   ClockCircleOutlined,
+  RadarChartOutlined,
 } from '@ant-design/icons';
 import { ColumnsType } from 'antd/es/table';
 import api from '@/api/client';
@@ -69,7 +71,20 @@ interface RunProfile {
 
 const PROTOCOLS = ['redis', 'resp2', 'resp3'];
 
+// ANN Benchmarks Run Profile types
+interface ANNRunProfile {
+  name: string;
+  description: string;
+  ef_search: number;
+  batch_size: number;
+  num_queries: number;
+  num_runs: number;
+  parallelism: number;
+  is_builtin?: boolean;
+}
+
 export default function RunProfiles() {
+  // Memtier state
   const [profiles, setProfiles] = useState<RunProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -77,8 +92,19 @@ export default function RunProfiles() {
   const [form] = Form.useForm();
   const [durationMode, setDurationMode] = useState<'duration' | 'requests'>('duration');
 
+  // ANN Benchmarks state
+  const [annProfiles, setAnnProfiles] = useState<ANNRunProfile[]>([]);
+  const [annLoading, setAnnLoading] = useState(true);
+  const [annModalOpen, setAnnModalOpen] = useState(false);
+  const [editingAnnProfile, setEditingAnnProfile] = useState<ANNRunProfile | null>(null);
+  const [annForm] = Form.useForm();
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState('memtier');
+
   useEffect(() => {
     loadProfiles();
+    loadAnnProfiles();
   }, []);
 
   const loadProfiles = async () => {
@@ -90,6 +116,49 @@ export default function RunProfiles() {
       message.error('Failed to load run profiles');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAnnProfiles = async () => {
+    try {
+      // TODO: Replace with actual API call when backend supports it
+      // For now, use mock data
+      setAnnProfiles([
+        {
+          name: 'quick-search',
+          description: 'Fast search with moderate accuracy',
+          ef_search: 50,
+          batch_size: 1,
+          num_queries: 10000,
+          num_runs: 3,
+          parallelism: 1,
+          is_builtin: true,
+        },
+        {
+          name: 'high-recall',
+          description: 'High accuracy search with larger ef_search',
+          ef_search: 200,
+          batch_size: 1,
+          num_queries: 10000,
+          num_runs: 3,
+          parallelism: 1,
+          is_builtin: true,
+        },
+        {
+          name: 'batch-search',
+          description: 'Batch queries for throughput testing',
+          ef_search: 100,
+          batch_size: 100,
+          num_queries: 100000,
+          num_runs: 5,
+          parallelism: 4,
+          is_builtin: true,
+        },
+      ]);
+    } catch (error) {
+      console.error('Failed to load ANN run profiles', error);
+    } finally {
+      setAnnLoading(false);
     }
   };
 
@@ -186,6 +255,81 @@ export default function RunProfiles() {
     } catch (error: unknown) {
       const err = error as { message?: string };
       message.error(err.message || 'Failed to save run profile');
+    }
+  };
+
+  // ANN Benchmarks handlers
+  const handleCreateAnn = () => {
+    setEditingAnnProfile(null);
+    annForm.resetFields();
+    annForm.setFieldsValue({
+      ef_search: 100,
+      batch_size: 1,
+      num_queries: 10000,
+      num_runs: 3,
+      parallelism: 1,
+    });
+    setAnnModalOpen(true);
+  };
+
+  const handleEditAnn = (profile: ANNRunProfile) => {
+    if (profile.is_builtin) {
+      message.warning('Cannot edit built-in profiles. Use duplicate instead.');
+      return;
+    }
+    setEditingAnnProfile(profile);
+    annForm.setFieldsValue(profile);
+    setAnnModalOpen(true);
+  };
+
+  const handleDuplicateAnn = (profile: ANNRunProfile) => {
+    setEditingAnnProfile(null);
+    annForm.setFieldsValue({
+      ...profile,
+      name: `${profile.name}-copy`,
+    });
+    setAnnModalOpen(true);
+  };
+
+  const handleDeleteAnn = async (name: string) => {
+    try {
+      // TODO: Replace with actual API call when backend supports it
+      setAnnProfiles(annProfiles.filter(p => p.name !== name));
+      message.success('ANN run profile deleted');
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      message.error(err.message || 'Failed to delete ANN run profile');
+    }
+  };
+
+  const handleSaveAnn = async () => {
+    try {
+      const values = await annForm.validateFields();
+      
+      const profile: ANNRunProfile = {
+        name: values.name,
+        description: values.description || '',
+        ef_search: values.ef_search,
+        batch_size: values.batch_size,
+        num_queries: values.num_queries,
+        num_runs: values.num_runs,
+        parallelism: values.parallelism,
+      };
+
+      if (editingAnnProfile) {
+        // TODO: Replace with actual API call
+        setAnnProfiles(annProfiles.map(p => p.name === editingAnnProfile.name ? profile : p));
+        message.success('ANN run profile updated');
+      } else {
+        // TODO: Replace with actual API call
+        setAnnProfiles([...annProfiles, profile]);
+        message.success('ANN run profile created');
+      }
+
+      setAnnModalOpen(false);
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      message.error(err.message || 'Failed to save ANN run profile');
     }
   };
 
@@ -303,6 +447,170 @@ export default function RunProfiles() {
     },
   ];
 
+  // ANN Benchmarks columns
+  const annColumns: ColumnsType<ANNRunProfile> = [
+    {
+      title: 'Name',
+      dataIndex: 'name',
+      key: 'name',
+      render: (name: string, record: ANNRunProfile) => (
+        <Space>
+          <RadarChartOutlined style={{ color: record.is_builtin ? '#1890ff' : '#52c41a' }} />
+          <Text strong>{name}</Text>
+          {record.is_builtin && (
+            <Tooltip title="Built-in profile (read-only)">
+              <LockOutlined style={{ color: '#999' }} />
+            </Tooltip>
+          )}
+        </Space>
+      ),
+    },
+    {
+      title: 'Description',
+      dataIndex: 'description',
+      key: 'description',
+      ellipsis: true,
+    },
+    {
+      title: 'ef_search',
+      dataIndex: 'ef_search',
+      key: 'ef_search',
+      width: 100,
+      render: (ef: number) => <Tag color="purple">{ef}</Tag>,
+    },
+    {
+      title: 'Batch Size',
+      dataIndex: 'batch_size',
+      key: 'batch_size',
+      width: 100,
+      render: (size: number) => <Tag color={size > 1 ? 'orange' : 'default'}>{size}</Tag>,
+    },
+    {
+      title: 'Queries',
+      dataIndex: 'num_queries',
+      key: 'num_queries',
+      width: 100,
+      render: (num: number) => <Text>{num.toLocaleString()}</Text>,
+    },
+    {
+      title: 'Runs',
+      dataIndex: 'num_runs',
+      key: 'num_runs',
+      width: 80,
+    },
+    {
+      title: 'Parallelism',
+      dataIndex: 'parallelism',
+      key: 'parallelism',
+      width: 100,
+      render: (p: number) => <Tag color={p > 1 ? 'cyan' : 'default'}>{p} worker{p > 1 ? 's' : ''}</Tag>,
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: 150,
+      render: (_, record: ANNRunProfile) => (
+        <Space>
+          <Tooltip title="Duplicate">
+            <Button type="text" icon={<CopyOutlined />} onClick={() => handleDuplicateAnn(record)} />
+          </Tooltip>
+          {!record.is_builtin && (
+            <>
+              <Tooltip title="Edit">
+                <Button type="text" icon={<EditOutlined />} onClick={() => handleEditAnn(record)} />
+              </Tooltip>
+              <Popconfirm
+                title="Delete ANN Run Profile"
+                description="Are you sure you want to delete this profile?"
+                onConfirm={() => handleDeleteAnn(record.name)}
+                okText="Delete"
+                okButtonProps={{ danger: true }}
+              >
+                <Tooltip title="Delete">
+                  <Button type="text" danger icon={<DeleteOutlined />} />
+                </Tooltip>
+              </Popconfirm>
+            </>
+          )}
+        </Space>
+      ),
+    },
+  ];
+
+  // Memtier Pane Content
+  const MemtierPane = () => (
+    <>
+      <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
+        <Col>
+          <Text type="secondary">
+            Configure threads, clients, duration, and pipelining for memtier_benchmark
+          </Text>
+        </Col>
+        <Col>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+            Create Profile
+          </Button>
+        </Col>
+      </Row>
+      <Table
+        columns={columns}
+        dataSource={profiles}
+        rowKey="name"
+        loading={loading}
+        pagination={false}
+        locale={{
+          emptyText: (
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description="No memtier run profiles found"
+            >
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+                Create Your First Profile
+              </Button>
+            </Empty>
+          ),
+        }}
+      />
+    </>
+  );
+
+  // ANN Benchmarks Pane Content
+  const AnnPane = () => (
+    <>
+      <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
+        <Col>
+          <Text type="secondary">
+            Configure query parameters for ann_benchmarks (ef_search, batch size, parallelism)
+          </Text>
+        </Col>
+        <Col>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreateAnn}>
+            Create ANN Profile
+          </Button>
+        </Col>
+      </Row>
+      <Table
+        columns={annColumns}
+        dataSource={annProfiles}
+        rowKey="name"
+        loading={annLoading}
+        pagination={false}
+        locale={{
+          emptyText: (
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description="No ANN run profiles found"
+            >
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleCreateAnn}>
+                Create Your First ANN Profile
+              </Button>
+            </Empty>
+          ),
+        }}
+      />
+    </>
+  );
+
   return (
     <div>
       <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
@@ -312,39 +620,41 @@ export default function RunProfiles() {
             Run Profiles
           </Title>
           <Text type="secondary">
-            Configure how benchmarks execute (threads, clients, duration, pipelining)
+            Configure how benchmarks execute
           </Text>
-        </Col>
-        <Col>
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-            Create Profile
-          </Button>
         </Col>
       </Row>
 
       <Card style={{ background: '#1f1f1f', border: '1px solid #303030' }}>
-        <Table
-          columns={columns}
-          dataSource={profiles}
-          rowKey="name"
-          loading={loading}
-          pagination={false}
-          locale={{
-            emptyText: (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="No run profiles found"
-              >
-                <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-                  Create Your First Profile
-                </Button>
-              </Empty>
-            ),
-          }}
+        <Tabs
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          items={[
+            {
+              key: 'memtier',
+              label: (
+                <span>
+                  <ThunderboltOutlined />
+                  memtier_benchmark
+                </span>
+              ),
+              children: <MemtierPane />,
+            },
+            {
+              key: 'ann',
+              label: (
+                <span>
+                  <RadarChartOutlined />
+                  ann_benchmarks
+                </span>
+              ),
+              children: <AnnPane />,
+            },
+          ]}
         />
       </Card>
 
-      {/* Run Profile Editor Modal */}
+      {/* Memtier Run Profile Editor Modal */}
       <Modal
         title={editingProfile ? 'Edit Run Profile' : 'Create Run Profile'}
         open={modalOpen}
@@ -497,6 +807,101 @@ export default function RunProfiles() {
               </Row>
             </Collapse.Panel>
           </Collapse>
+        </Form>
+      </Modal>
+
+      {/* ANN Benchmarks Run Profile Editor Modal */}
+      <Modal
+        title={editingAnnProfile ? 'Edit ANN Run Profile' : 'Create ANN Run Profile'}
+        open={annModalOpen}
+        onCancel={() => setAnnModalOpen(false)}
+        onOk={handleSaveAnn}
+        width={600}
+        okText={editingAnnProfile ? 'Update' : 'Create'}
+      >
+        <Form form={annForm} layout="vertical">
+          <Row gutter={16}>
+            <Col span={24}>
+              <Form.Item
+                name="name"
+                label="Profile Name"
+                rules={[
+                  { required: true, message: 'Please enter a name' },
+                  { pattern: /^[a-z0-9-]+$/, message: 'Only lowercase letters, numbers, and hyphens' }
+                ]}
+              >
+                <Input placeholder="my-ann-profile" disabled={!!editingAnnProfile} />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item name="description" label="Description">
+            <TextArea rows={2} placeholder="Describe what this profile is optimized for..." />
+          </Form.Item>
+
+          <Divider>Query Parameters</Divider>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item 
+                name="ef_search" 
+                label="ef_search" 
+                rules={[{ required: true }]}
+                tooltip="Search-time parameter. Higher = better recall but slower queries"
+              >
+                <InputNumber min={1} max={2000} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item 
+                name="batch_size" 
+                label="Batch Size" 
+                rules={[{ required: true }]}
+                tooltip="Number of vectors to query in a single batch"
+              >
+                <InputNumber min={1} max={10000} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Divider>Execution</Divider>
+
+          <Row gutter={16}>
+            <Col span={8}>
+              <Form.Item 
+                name="num_queries" 
+                label="Number of Queries" 
+                rules={[{ required: true }]}
+                tooltip="Total queries to execute per run"
+              >
+                <InputNumber min={1} max={10000000} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item 
+                name="num_runs" 
+                label="Number of Runs" 
+                rules={[{ required: true }]}
+                tooltip="Number of benchmark iterations for averaging"
+              >
+                <InputNumber min={1} max={100} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item 
+                name="parallelism" 
+                label="Parallelism" 
+                rules={[{ required: true }]}
+                tooltip="Number of parallel query workers"
+              >
+                <InputNumber min={1} max={64} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Text type="secondary" style={{ display: 'block', marginTop: 16 }}>
+            💡 Index parameters (M, ef_construction) and dataset are configured in <strong>Workload Profiles</strong>.
+          </Text>
         </Form>
       </Modal>
     </div>

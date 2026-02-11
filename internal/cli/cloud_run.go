@@ -371,21 +371,26 @@ func runCloudRun(cmd *cobra.Command, args []string) error {
 		}()
 	}
 
-	// Create SSH executor
-	sshExecutor := cloud.NewSSHExecutor()
-
-	// Get SSH config from flags/config
-	sshConfig := map[string]interface{}{
-		"user": "ubuntu",
-		"port": 22,
-	}
-	if keyPath := viper.GetString("ssh.private_key_path"); keyPath != "" {
-		sshConfig["private_key_path"] = keyPath
+	// Create SSH executor with provider-specific configuration
+	sshUser := "ubuntu"
+	if provider == "azure" {
+		sshUser = "azureuser"
 	}
 
-	if err := sshExecutor.Initialize(ctx, sshConfig); err != nil {
-		return fmt.Errorf("failed to initialize SSH executor: %w", err)
+	// Get private key path - try config, then use default
+	keyPath := viper.GetString("ssh.private_key_path")
+	if keyPath == "" {
+		homeDir, _ := os.UserHomeDir()
+		keyPath = filepath.Join(homeDir, ".ssh", "id_rsa")
 	}
+
+	sshConfig := cloud.SSHConfig{
+		User:           sshUser,
+		PrivateKeyPath: keyPath,
+		Port:           22,
+		ConnectTimeout: 30 * time.Second,
+	}
+	sshExecutor := cloud.NewSSHExecutor(sshConfig)
 
 	// Wait for SSH to be available on all instances
 	if !jsonOutput {
@@ -1085,9 +1090,14 @@ func saveCloudBenchmarkRun(ctx context.Context, wl *domain.Workload, target *dom
 		return nil, fmt.Errorf("failed to create storage: %w", err)
 	}
 
+	// Generate run ID consistent with local benchmark format: YYYYMMDD-HHMMSS-XXXX
+	runID := fmt.Sprintf("%s-%s", startTime.Format("20060102-150405"), uuid.New().String()[:8])
+
 	// Create benchmark run
 	run := &domain.BenchmarkRun{
-		ID:        uuid.New().String(),
+		ID:        runID,
+		CreatedAt: startTime,
+		UpdatedAt: endTime,
 		Workload:  wl,
 		Target:    target,
 		StartTime: startTime,
@@ -1188,6 +1198,11 @@ func buildMemtierCommand(wl *domain.Workload, target *domain.Target, jsonOutFile
 
 	if target.Password != "" {
 		args = append(args, "-a", target.Password)
+	}
+
+	// Cluster mode (for Redis Cluster or AMR OSSCluster)
+	if target.Cluster {
+		args = append(args, "--cluster-mode")
 	}
 
 	if target.TLS != nil && target.TLS.Enabled {

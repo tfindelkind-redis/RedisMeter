@@ -288,7 +288,7 @@ func (s *Server) listRuns(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var runs []*domain.BenchmarkRun
-	if err := s.storage.Query(ctx, "benchmark_run", filter, &runs); err != nil {
+	if err := s.storage.Query(ctx, "runs", filter, &runs); err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to query runs: "+err.Error())
 		return
 	}
@@ -308,7 +308,7 @@ func (s *Server) createRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := s.storage.Save(ctx, "benchmark_run", &run)
+	id, err := s.storage.Save(ctx, "runs", &run)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to save run: "+err.Error())
 		return
@@ -340,7 +340,7 @@ func (s *Server) getRun(w http.ResponseWriter, r *http.Request, id string) {
 	ctx := r.Context()
 
 	var run domain.BenchmarkRun
-	if err := s.storage.Load(ctx, "benchmark_run", id, &run); err != nil {
+	if err := s.storage.Load(ctx, "runs", id, &run); err != nil {
 		writeError(w, http.StatusNotFound, "Run not found: "+err.Error())
 		return
 	}
@@ -351,7 +351,7 @@ func (s *Server) getRun(w http.ResponseWriter, r *http.Request, id string) {
 func (s *Server) deleteRun(w http.ResponseWriter, r *http.Request, id string) {
 	ctx := r.Context()
 
-	if err := s.storage.Delete(ctx, "benchmark_run", id); err != nil {
+	if err := s.storage.Delete(ctx, "runs", id); err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to delete run: "+err.Error())
 		return
 	}
@@ -1099,13 +1099,13 @@ func (s *Server) handleCompare(w http.ResponseWriter, r *http.Request) {
 
 	// Load runs
 	var run1 domain.BenchmarkRun
-	if err := s.storage.Load(ctx, "benchmark_run", req.RunID1, &run1); err != nil {
+	if err := s.storage.Load(ctx, "runs", req.RunID1, &run1); err != nil {
 		writeError(w, http.StatusNotFound, "Run 1 not found: "+err.Error())
 		return
 	}
 
 	var run2 domain.BenchmarkRun
-	if err := s.storage.Load(ctx, "benchmark_run", req.RunID2, &run2); err != nil {
+	if err := s.storage.Load(ctx, "runs", req.RunID2, &run2); err != nil {
 		writeError(w, http.StatusNotFound, "Run 2 not found: "+err.Error())
 		return
 	}
@@ -1136,7 +1136,7 @@ func (s *Server) handleAnalyze(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var run domain.BenchmarkRun
-	if err := s.storage.Load(ctx, "benchmark_run", req.RunID, &run); err != nil {
+	if err := s.storage.Load(ctx, "runs", req.RunID, &run); err != nil {
 		writeError(w, http.StatusNotFound, "Run not found: "+err.Error())
 		return
 	}
@@ -1325,13 +1325,75 @@ func contains(slice []string, item string) bool {
 
 // InfraCreateRequest is the request body for creating infrastructure.
 type InfraCreateRequest struct {
-	Name     string             `json:"name"`
-	Provider string             `json:"provider"`
-	Region   string             `json:"region"`
-	TTL      string             `json:"ttl,omitempty"`
-	Tags     map[string]string  `json:"tags,omitempty"`
-	AMR      *InfraAMRConfig    `json:"amr,omitempty"`
-	Runners  *InfraRunnerConfig `json:"runners,omitempty"`
+	Name        string                `json:"name"`
+	Provider    string                `json:"provider"`
+	Region      string                `json:"region"`
+	TTL         string                `json:"ttl,omitempty"`
+	Tags        map[string]string     `json:"tags,omitempty"`
+	AMR         *InfraAMRConfig       `json:"amr,omitempty"`
+	Runners     *InfraRunnerConfig    `json:"runners,omitempty"`
+	SelfManaged *SelfManagedConfig    `json:"self_managed,omitempty"`
+	EncryptionKey string              `json:"encryption_key,omitempty"` // For decrypting self-managed credentials
+}
+
+// SelfManagedConfig holds configuration for self-managed (BYOI) infrastructure.
+type SelfManagedConfig struct {
+	Runners    SelfManagedRunners    `json:"runners"`
+	Redis      SelfManagedRedis      `json:"redis"`
+	ToolPaths  map[string]string     `json:"tool_paths,omitempty"`
+}
+
+// SelfManagedRunners holds runner machine configuration.
+type SelfManagedRunners struct {
+	Machines []RunnerMachine       `json:"machines"`
+	SSH      SSHConfig             `json:"ssh"`
+}
+
+// RunnerMachine represents a single runner machine.
+type RunnerMachine struct {
+	Name   string            `json:"name,omitempty"`
+	Host   string            `json:"host"`
+	Port   int               `json:"port,omitempty"`
+	Labels map[string]string `json:"labels,omitempty"`
+}
+
+// SSHConfig holds SSH authentication configuration (credentials are encrypted).
+type SSHConfig struct {
+	AuthMethod           string `json:"auth_method"` // "password", "key", or "key_file"
+	Username             string `json:"username"`
+	Password             string `json:"password,omitempty"`              // Encrypted
+	PrivateKey           string `json:"private_key,omitempty"`           // Encrypted
+	PrivateKeyPath       string `json:"private_key_path,omitempty"`      // Path on server
+	Passphrase           string `json:"passphrase,omitempty"`            // Encrypted
+	Port                 int    `json:"port,omitempty"`                  // Default: 22
+	ConnectTimeout       int    `json:"connect_timeout,omitempty"`       // Default: 30
+	StrictHostKeyChecking bool  `json:"strict_host_key_checking,omitempty"`
+}
+
+// SelfManagedRedis holds Redis target configuration.
+type SelfManagedRedis struct {
+	Targets     []RedisTarget       `json:"targets"`
+	Credentials RedisCredentials    `json:"credentials"`
+}
+
+// RedisTarget represents a Redis instance to benchmark.
+type RedisTarget struct {
+	Name         string   `json:"name,omitempty"`
+	Host         string   `json:"host"`
+	Port         int      `json:"port"`
+	IsCluster    bool     `json:"is_cluster,omitempty"`
+	ClusterNodes []string `json:"cluster_nodes,omitempty"`
+}
+
+// RedisCredentials holds Redis authentication (password is encrypted).
+type RedisCredentials struct {
+	Username      string `json:"username,omitempty"`
+	Password      string `json:"password,omitempty"`        // Encrypted
+	TLSEnabled    bool   `json:"tls_enabled,omitempty"`
+	TLSSkipVerify bool   `json:"tls_skip_verify,omitempty"`
+	TLSCert       string `json:"tls_cert,omitempty"`
+	TLSKey        string `json:"tls_key,omitempty"`         // Encrypted
+	TLSCA         string `json:"tls_ca,omitempty"`
 }
 
 // InfraAMRConfig is the AMR configuration for infrastructure.
@@ -1429,6 +1491,12 @@ func (s *Server) createInfrastructure(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Region == "" {
 		writeError(w, http.StatusBadRequest, "region is required")
+		return
+	}
+
+	// Handle self-managed infrastructure specially
+	if req.Provider == "self_managed" {
+		s.createSelfManagedInfrastructure(w, req)
 		return
 	}
 
@@ -1544,6 +1612,105 @@ func (s *Server) createInfrastructure(w http.ResponseWriter, r *http.Request) {
 		"id":      op.ID,
 		"status":  "provisioning",
 		"message": "Infrastructure provisioning started. Poll /api/v1/infrastructures for status.",
+	})
+}
+
+// createSelfManagedInfrastructure handles self-managed (BYOI) infrastructure registration.
+// Unlike cloud providers, self-managed infra doesn't require provisioning - it's immediately ready.
+func (s *Server) createSelfManagedInfrastructure(w http.ResponseWriter, req InfraCreateRequest) {
+	// Validate self-managed config
+	if req.SelfManaged == nil {
+		writeError(w, http.StatusBadRequest, "self_managed configuration is required for self-managed provider")
+		return
+	}
+
+	if len(req.SelfManaged.Runners.Machines) == 0 {
+		writeError(w, http.StatusBadRequest, "at least one runner machine is required")
+		return
+	}
+
+	if len(req.SelfManaged.Redis.Targets) == 0 {
+		writeError(w, http.StatusBadRequest, "at least one Redis target is required")
+		return
+	}
+
+	// Validate SSH credentials
+	ssh := req.SelfManaged.Runners.SSH
+	if ssh.Username == "" {
+		writeError(w, http.StatusBadRequest, "SSH username is required")
+		return
+	}
+
+	switch ssh.AuthMethod {
+	case "password":
+		if ssh.Password == "" {
+			writeError(w, http.StatusBadRequest, "SSH password is required for password authentication")
+			return
+		}
+	case "key":
+		if ssh.PrivateKey == "" {
+			writeError(w, http.StatusBadRequest, "SSH private key is required for key authentication")
+			return
+		}
+	case "key_file":
+		if ssh.PrivateKeyPath == "" {
+			writeError(w, http.StatusBadRequest, "SSH private key path is required for key_file authentication")
+			return
+		}
+	default:
+		writeError(w, http.StatusBadRequest, "Invalid SSH auth method: "+ssh.AuthMethod)
+		return
+	}
+
+	// Generate unique ID
+	id := fmt.Sprintf("rm-self-%s-%d", strings.ReplaceAll(req.Name, " ", "-"), time.Now().Unix())
+	
+	// Create state - self-managed infra is immediately ready
+	now := time.Now()
+	state := &terraform.InfraState{
+		ID:        id,
+		Name:      req.Name,
+		Status:    "ready", // Immediately ready - no provisioning needed
+		Provider:  "self_managed",
+		Region:    "custom",
+		CreatedAt: now,
+		UpdatedAt: now,
+		Config: terraform.InfraConfig{
+			Name:     req.Name,
+			Provider: "self_managed",
+			Region:   "custom",
+			Tags:     req.Tags,
+		},
+		Outputs: &terraform.InfraOutputs{
+			// For self-managed, we populate outputs from the provided config
+			RedisHostname:    req.SelfManaged.Redis.Targets[0].Host,
+			RedisPort:        req.SelfManaged.Redis.Targets[0].Port,
+			RunnerIPs:        make([]string, 0, len(req.SelfManaged.Runners.Machines)),
+			RunnerPrivateIPs: make([]string, 0, len(req.SelfManaged.Runners.Machines)),
+		},
+	}
+
+	// Populate runner IPs
+	for _, machine := range req.SelfManaged.Runners.Machines {
+		state.Outputs.RunnerIPs = append(state.Outputs.RunnerIPs, machine.Host)
+		state.Outputs.RunnerPrivateIPs = append(state.Outputs.RunnerPrivateIPs, machine.Host)
+	}
+
+	// Store the state
+	if s.infraManager != nil {
+		if err := s.infraManager.CreateSelfManagedState(state, req.SelfManaged, req.EncryptionKey); err != nil {
+			writeError(w, http.StatusInternalServerError, "Failed to store infrastructure state: "+err.Error())
+			return
+		}
+	}
+
+	// Return success immediately
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"id":      id,
+		"name":    req.Name,
+		"status":  "ready",
+		"message": "Self-managed infrastructure registered successfully",
+		"outputs": state.Outputs,
 	})
 }
 
@@ -1887,7 +2054,7 @@ func (s *Server) runCloudBenchmark(ctx context.Context, benchmarkID string, stat
 		}
 	}
 
-	if _, err := s.storage.Save(ctx, "benchmark_run", run); err != nil {
+	if _, err := s.storage.Save(ctx, "runs", run); err != nil {
 		log.Printf("Cloud benchmark %s: failed to save: %v", benchmarkID, err)
 		updateStatus("failed", 0)
 		return

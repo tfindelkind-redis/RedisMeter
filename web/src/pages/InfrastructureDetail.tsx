@@ -57,6 +57,7 @@ const providerColors: Record<CloudProvider, string> = {
   kubernetes: '#326ce5',
   vmware: '#607078',
   local: '#52c41a',
+  self_managed: '#722ed1',
 };
 
 export default function InfrastructureDetail() {

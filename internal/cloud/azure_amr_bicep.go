@@ -7,8 +7,11 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
@@ -180,7 +183,69 @@ func (d *AMRBicepDeployer) DeployAMR(ctx context.Context, resourceGroup string, 
 	}
 
 	// Extract outputs from deployment
-	return extractDeploymentOutputs(result.Properties.Outputs)
+	deployResult, err := extractDeploymentOutputs(result.Properties.Outputs)
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch access keys separately since secure outputs aren't returned in ARM deployment results
+	keys, err := d.getAccessKeys(ctx, resourceGroup, params.RedisName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get access keys: %w", err)
+	}
+	deployResult.RedisPrimaryKey = keys.PrimaryKey
+	deployResult.RedisSecondaryKey = keys.SecondaryKey
+
+	return deployResult, nil
+}
+
+// accessKeysResponse represents the response from the listKeys API.
+type accessKeysResponse struct {
+	PrimaryKey   string `json:"primaryKey"`
+	SecondaryKey string `json:"secondaryKey"`
+}
+
+// getAccessKeys retrieves the access keys for an AMR database using the REST API.
+func (d *AMRBicepDeployer) getAccessKeys(ctx context.Context, resourceGroup, clusterName string) (*accessKeysResponse, error) {
+	// Get an access token for the Azure management API
+	token, err := d.credential.GetToken(ctx, policy.TokenRequestOptions{
+		Scopes: []string{"https://management.azure.com/.default"},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get access token: %w", err)
+	}
+
+	// Call the listKeys API
+	url := fmt.Sprintf(
+		"https://management.azure.com/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Cache/redisEnterprise/%s/databases/default/listKeys?api-version=2025-05-01-preview",
+		d.subscriptionID, resourceGroup, clusterName,
+	)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token.Token)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call listKeys API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("listKeys API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var keys accessKeysResponse
+	if err := json.NewDecoder(resp.Body).Decode(&keys); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &keys, nil
 }
 
 // extractDeploymentOutputs extracts the outputs from an ARM deployment result.

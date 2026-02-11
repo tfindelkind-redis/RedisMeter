@@ -237,15 +237,20 @@ func runProfilesShow(cmd *cobra.Command, args []string) error {
 	case infraprofile.ProviderAzure:
 		if profile.Config.Azure != nil {
 			cfg := profile.Config.Azure
-			fmt.Printf("  Location:      %s\n", cfg.Location)
-			fmt.Printf("  SKU:           %s\n", cfg.SKU)
-			fmt.Printf("  Family:        %s\n", cfg.Family)
-			fmt.Printf("  Capacity:      %d\n", cfg.Capacity)
+			fmt.Printf("  Location:        %s\n", cfg.Location)
+			fmt.Printf("  SKU:             %s\n", cfg.SKU)
+			fmt.Printf("  High Availability: %t\n", cfg.HighAvailability)
+			if cfg.PersistenceType != "" {
+				fmt.Printf("  Persistence:     %s\n", cfg.PersistenceType)
+			}
+			if len(cfg.Modules) > 0 {
+				fmt.Printf("  Modules:         %s\n", strings.Join(cfg.Modules, ", "))
+			}
 			if cfg.VMSize != "" {
-				fmt.Printf("  VM Size:       %s\n", cfg.VMSize)
+				fmt.Printf("  VM Size:         %s\n", cfg.VMSize)
 			}
 			if cfg.VMCount > 0 {
-				fmt.Printf("  VM Count:      %d\n", cfg.VMCount)
+				fmt.Printf("  VM Count:        %d\n", cfg.VMCount)
 			}
 		}
 	case infraprofile.ProviderAWS:

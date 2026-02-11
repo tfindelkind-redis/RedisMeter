@@ -19,6 +19,7 @@ import AzureProvider from './AzureProvider';
 import AWSProvider from './AWSProvider';
 import GCPProvider from './GCPProvider';
 import KubernetesProvider from './KubernetesProvider';
+import SelfManagedProvider from './SelfManagedProvider';
 
 // Provider form components
 export const PROVIDER_COMPONENTS: Record<CloudProvider, React.ComponentType<any>> = {
@@ -28,6 +29,7 @@ export const PROVIDER_COMPONENTS: Record<CloudProvider, React.ComponentType<any>
   kubernetes: KubernetesProvider,
   vmware: () => null, // Placeholder
   local: () => null, // Placeholder
+  self_managed: SelfManagedProvider,
 };
 
 // Get enabled providers
@@ -40,4 +42,4 @@ export const getAllProviders = (): ProviderInfo[] => {
   return Object.values(PROVIDER_INFO);
 };
 
-export { AzureProvider, AWSProvider, GCPProvider, KubernetesProvider };
+export { AzureProvider, AWSProvider, GCPProvider, KubernetesProvider, SelfManagedProvider };

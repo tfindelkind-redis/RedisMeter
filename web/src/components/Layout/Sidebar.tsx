@@ -51,7 +51,7 @@ export default function Sidebar() {
     {
       key: '/infrastructure',
       icon: <CloudOutlined />,
-      label: 'Cloud Infrastructure',
+      label: 'Infrastructure',
     },
     {
       key: '/infra-profiles',
@@ -92,8 +92,8 @@ export default function Sidebar() {
     <Sider
       width={240}
       style={{
-        background: '#fafafa',
-        borderRight: '1px solid #e8e8e8',
+        background: '#141414',
+        borderRight: '1px solid #333333',
       }}
     >
       <div
@@ -102,8 +102,8 @@ export default function Sidebar() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          borderBottom: '1px solid #e8e8e8',
-          background: '#fafafa',
+          borderBottom: '1px solid #333333',
+          background: '#141414',
         }}
       >
         <BarChartOutlined
@@ -113,7 +113,7 @@ export default function Sidebar() {
           style={{
             fontSize: 18,
             fontWeight: 600,
-            color: '#1f1f1f',
+            color: '#ffffff',
           }}
         >
           RedisMeter
@@ -121,10 +121,10 @@ export default function Sidebar() {
       </div>
       <Menu
         mode="inline"
-        theme="light"
+        theme="dark"
         selectedKeys={[location.pathname]}
         style={{
-          background: '#fafafa',
+          background: '#141414',
           borderRight: 0,
           marginTop: 8,
         }}

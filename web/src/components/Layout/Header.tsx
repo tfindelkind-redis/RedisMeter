@@ -11,9 +11,9 @@ export default function Header() {
   return (
     <AntHeader
       style={{
-        background: '#fafafa',
+        background: '#141414',
         padding: '0 24px',
-        borderBottom: '1px solid #e8e8e8',
+        borderBottom: '1px solid #333333',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -23,7 +23,7 @@ export default function Header() {
         {activeBenchmark && (
           <Space>
             <SyncOutlined spin style={{ color: '#1890ff' }} />
-            <Text style={{ color: 'rgba(0,0,0,0.85)' }}>
+            <Text style={{ color: 'rgba(255,255,255,0.85)' }}>
               Benchmark running...
             </Text>
             <Progress
@@ -38,7 +38,7 @@ export default function Header() {
         <Badge
           status={wsConnected ? 'success' : 'error'}
           text={
-            <Text style={{ color: 'rgba(0,0,0,0.65)' }}>
+            <Text style={{ color: 'rgba(255,255,255,0.65)' }}>
               {wsConnected ? (
                 <>
                   <WifiOutlined /> Connected

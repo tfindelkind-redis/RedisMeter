@@ -19,6 +19,7 @@ import {
   Popconfirm,
   Tooltip,
   Empty,
+  Tabs,
 } from 'antd';
 import {
   PlusOutlined,
@@ -27,6 +28,7 @@ import {
   CopyOutlined,
   ThunderboltOutlined,
   LockOutlined,
+  RadarChartOutlined,
 } from '@ant-design/icons';
 import { ColumnsType } from 'antd/es/table';
 import api from '@/api/client';
@@ -78,7 +80,40 @@ interface WorkloadFull {
 const COMMANDS = ['GET', 'SET', 'MGET', 'MSET', 'HGET', 'HSET', 'HMGET', 'HMSET', 'LPUSH', 'LPOP', 'RPUSH', 'RPOP', 'LRANGE', 'SADD', 'SMEMBERS', 'SREM', 'ZADD', 'ZRANGE', 'ZRANGEBYSCORE', 'INCR', 'DECR', 'INCRBY', 'APPEND', 'GETEX', 'SETEX', 'PFADD', 'PFCOUNT', 'XADD', 'XREAD', 'WAIT'];
 const KEY_PATTERNS = ['random', 'sequential', 'gaussian', 'zipf'];
 
+// ANN Benchmarks types and constants
+interface ANNWorkload {
+  name: string;
+  description: string;
+  dataset: string;
+  distance_metric: string;
+  dimensions: number;
+  k: number;
+  m?: number;
+  ef_construction?: number;
+  is_builtin?: boolean;
+}
+
+const ANN_DATASETS = [
+  { value: 'sift-128-euclidean', label: 'SIFT (128D, L2)', dimensions: 128 },
+  { value: 'gist-960-euclidean', label: 'GIST (960D, L2)', dimensions: 960 },
+  { value: 'glove-25-angular', label: 'GloVe-25 (25D, Cosine)', dimensions: 25 },
+  { value: 'glove-50-angular', label: 'GloVe-50 (50D, Cosine)', dimensions: 50 },
+  { value: 'glove-100-angular', label: 'GloVe-100 (100D, Cosine)', dimensions: 100 },
+  { value: 'glove-200-angular', label: 'GloVe-200 (200D, Cosine)', dimensions: 200 },
+  { value: 'mnist-784-euclidean', label: 'MNIST (784D, L2)', dimensions: 784 },
+  { value: 'fashion-mnist-784-euclidean', label: 'Fashion-MNIST (784D, L2)', dimensions: 784 },
+  { value: 'deep-image-96-angular', label: 'Deep Image (96D, Cosine)', dimensions: 96 },
+  { value: 'custom', label: 'Custom Dataset', dimensions: 0 },
+];
+
+const DISTANCE_METRICS = [
+  { value: 'L2', label: 'L2 (Euclidean)' },
+  { value: 'IP', label: 'IP (Inner Product)' },
+  { value: 'COSINE', label: 'Cosine Similarity' },
+];
+
 export default function Workloads() {
+  // Memtier state
   const [workloads, setWorkloads] = useState<WorkloadFull[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -86,8 +121,19 @@ export default function Workloads() {
   const [form] = Form.useForm();
   const [operations, setOperations] = useState<Operation[]>([{ command: 'GET', ratio: 0.8 }, { command: 'SET', ratio: 0.2 }]);
 
+  // ANN Benchmarks state
+  const [annWorkloads, setAnnWorkloads] = useState<ANNWorkload[]>([]);
+  const [annLoading, setAnnLoading] = useState(true);
+  const [annModalOpen, setAnnModalOpen] = useState(false);
+  const [editingAnnWorkload, setEditingAnnWorkload] = useState<ANNWorkload | null>(null);
+  const [annForm] = Form.useForm();
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState('memtier');
+
   useEffect(() => {
     loadWorkloads();
+    loadAnnWorkloads();
   }, []);
 
   const loadWorkloads = async () => {
@@ -115,6 +161,41 @@ export default function Workloads() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAnnWorkloads = async () => {
+    try {
+      // TODO: Replace with actual API call when backend supports it
+      // For now, use mock data
+      setAnnWorkloads([
+        {
+          name: 'sift-baseline',
+          description: 'SIFT 1M baseline benchmark with HNSW index',
+          dataset: 'sift-128-euclidean',
+          distance_metric: 'L2',
+          dimensions: 128,
+          k: 10,
+          m: 16,
+          ef_construction: 200,
+          is_builtin: true,
+        },
+        {
+          name: 'glove-semantic',
+          description: 'GloVe word embeddings similarity search',
+          dataset: 'glove-100-angular',
+          distance_metric: 'COSINE',
+          dimensions: 100,
+          k: 10,
+          m: 16,
+          ef_construction: 200,
+          is_builtin: true,
+        },
+      ]);
+    } catch (error) {
+      console.error('Failed to load ANN workloads', error);
+    } finally {
+      setAnnLoading(false);
     }
   };
 
@@ -268,6 +349,96 @@ export default function Workloads() {
     setOperations(normalized);
   };
 
+  // ANN Benchmarks handlers
+  const handleCreateAnn = () => {
+    setEditingAnnWorkload(null);
+    annForm.resetFields();
+    annForm.setFieldsValue({
+      dataset: 'sift-128-euclidean',
+      distance_metric: 'L2',
+      dimensions: 128,
+      k: 10,
+      m: 16,
+      ef_construction: 200,
+    });
+    setAnnModalOpen(true);
+  };
+
+  const handleEditAnn = (workload: ANNWorkload) => {
+    if (workload.is_builtin) {
+      message.warning('Cannot edit built-in workloads. Use duplicate instead.');
+      return;
+    }
+    setEditingAnnWorkload(workload);
+    annForm.setFieldsValue(workload);
+    setAnnModalOpen(true);
+  };
+
+  const handleDuplicateAnn = (workload: ANNWorkload) => {
+    setEditingAnnWorkload(null);
+    annForm.setFieldsValue({
+      ...workload,
+      name: `${workload.name}-copy`,
+    });
+    setAnnModalOpen(true);
+  };
+
+  const handleDeleteAnn = async (name: string) => {
+    try {
+      // TODO: Replace with actual API call when backend supports it
+      setAnnWorkloads(annWorkloads.filter(w => w.name !== name));
+      message.success('ANN workload deleted');
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      message.error(err.message || 'Failed to delete ANN workload');
+    }
+  };
+
+  const handleSaveAnn = async () => {
+    try {
+      const values = await annForm.validateFields();
+      
+      const workload: ANNWorkload = {
+        name: values.name,
+        description: values.description || '',
+        dataset: values.dataset,
+        distance_metric: values.distance_metric,
+        dimensions: values.dimensions,
+        k: values.k,
+        m: values.m,
+        ef_construction: values.ef_construction,
+      };
+
+      if (editingAnnWorkload) {
+        // TODO: Replace with actual API call
+        setAnnWorkloads(annWorkloads.map(w => w.name === editingAnnWorkload.name ? workload : w));
+        message.success('ANN workload updated');
+      } else {
+        // TODO: Replace with actual API call
+        setAnnWorkloads([...annWorkloads, workload]);
+        message.success('ANN workload created');
+      }
+
+      setAnnModalOpen(false);
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      message.error(err.message || 'Failed to save ANN workload');
+    }
+  };
+
+  const handleDatasetChange = (dataset: string) => {
+    const datasetInfo = ANN_DATASETS.find(d => d.value === dataset);
+    if (datasetInfo && datasetInfo.dimensions > 0) {
+      annForm.setFieldsValue({ dimensions: datasetInfo.dimensions });
+      // Set default distance metric based on dataset name
+      if (dataset.includes('angular') || dataset.includes('cosine')) {
+        annForm.setFieldsValue({ distance_metric: 'COSINE' });
+      } else if (dataset.includes('euclidean')) {
+        annForm.setFieldsValue({ distance_metric: 'L2' });
+      }
+    }
+  };
+
   const columns: ColumnsType<WorkloadFull> = [
     {
       title: 'Name',
@@ -363,6 +534,177 @@ export default function Workloads() {
     },
   ];
 
+  // ANN Benchmarks columns
+  const annColumns: ColumnsType<ANNWorkload> = [
+    {
+      title: 'Name',
+      dataIndex: 'name',
+      key: 'name',
+      render: (name: string, record: ANNWorkload) => (
+        <Space>
+          <RadarChartOutlined style={{ color: record.is_builtin ? '#1890ff' : '#52c41a' }} />
+          <Text strong>{name}</Text>
+          {record.is_builtin && (
+            <Tooltip title="Built-in workload (read-only)">
+              <LockOutlined style={{ color: '#999' }} />
+            </Tooltip>
+          )}
+        </Space>
+      ),
+    },
+    {
+      title: 'Description',
+      dataIndex: 'description',
+      key: 'description',
+      ellipsis: true,
+    },
+    {
+      title: 'Dataset',
+      dataIndex: 'dataset',
+      key: 'dataset',
+      width: 180,
+      render: (dataset: string) => {
+        const info = ANN_DATASETS.find(d => d.value === dataset);
+        return <Tag color="purple">{info?.label || dataset}</Tag>;
+      },
+    },
+    {
+      title: 'Distance',
+      dataIndex: 'distance_metric',
+      key: 'distance_metric',
+      width: 100,
+      render: (metric: string) => <Tag color="cyan">{metric}</Tag>,
+    },
+    {
+      title: 'Dimensions',
+      dataIndex: 'dimensions',
+      key: 'dimensions',
+      width: 100,
+      render: (dim: number) => <Text>{dim}D</Text>,
+    },
+    {
+      title: 'K (neighbors)',
+      dataIndex: 'k',
+      key: 'k',
+      width: 100,
+    },
+    {
+      title: 'Index Params',
+      key: 'index_params',
+      width: 150,
+      render: (_, record: ANNWorkload) => (
+        <Space direction="vertical" size={0}>
+          <Text type="secondary" style={{ fontSize: 12 }}>M: {record.m || 16}</Text>
+          <Text type="secondary" style={{ fontSize: 12 }}>ef_c: {record.ef_construction || 200}</Text>
+        </Space>
+      ),
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: 150,
+      render: (_, record: ANNWorkload) => (
+        <Space>
+          <Tooltip title="Duplicate">
+            <Button type="text" icon={<CopyOutlined />} onClick={() => handleDuplicateAnn(record)} />
+          </Tooltip>
+          {!record.is_builtin && (
+            <>
+              <Tooltip title="Edit">
+                <Button type="text" icon={<EditOutlined />} onClick={() => handleEditAnn(record)} />
+              </Tooltip>
+              <Popconfirm
+                title="Delete ANN Workload"
+                description="Are you sure you want to delete this workload?"
+                onConfirm={() => handleDeleteAnn(record.name)}
+                okText="Delete"
+                okButtonProps={{ danger: true }}
+              >
+                <Tooltip title="Delete">
+                  <Button type="text" danger icon={<DeleteOutlined />} />
+                </Tooltip>
+              </Popconfirm>
+            </>
+          )}
+        </Space>
+      ),
+    },
+  ];
+
+  // Memtier Pane Content
+  const MemtierPane = () => (
+    <>
+      <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
+        <Col>
+          <Text type="secondary">
+            Configure Redis commands, key patterns, and data sizes for memtier_benchmark
+          </Text>
+        </Col>
+        <Col>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+            Create Workload
+          </Button>
+        </Col>
+      </Row>
+      <Table
+        columns={columns}
+        dataSource={workloads}
+        rowKey="name"
+        loading={loading}
+        pagination={false}
+        locale={{
+          emptyText: (
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description="No memtier workloads found"
+            >
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+                Create Your First Workload
+              </Button>
+            </Empty>
+          ),
+        }}
+      />
+    </>
+  );
+
+  // ANN Benchmarks Pane Content
+  const AnnPane = () => (
+    <>
+      <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
+        <Col>
+          <Text type="secondary">
+            Configure vector search workloads for ann_benchmarks
+          </Text>
+        </Col>
+        <Col>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreateAnn}>
+            Create ANN Workload
+          </Button>
+        </Col>
+      </Row>
+      <Table
+        columns={annColumns}
+        dataSource={annWorkloads}
+        rowKey="name"
+        loading={annLoading}
+        pagination={false}
+        locale={{
+          emptyText: (
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description="No ANN workloads found"
+            >
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleCreateAnn}>
+                Create Your First ANN Workload
+              </Button>
+            </Empty>
+          ),
+        }}
+      />
+    </>
+  );
+
   return (
     <div>
       <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
@@ -372,36 +714,38 @@ export default function Workloads() {
             Workload Profiles
           </Title>
         </Col>
-        <Col>
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-            Create Workload
-          </Button>
-        </Col>
       </Row>
 
       <Card style={{ background: '#1f1f1f', border: '1px solid #303030' }}>
-        <Table
-          columns={columns}
-          dataSource={workloads}
-          rowKey="name"
-          loading={loading}
-          pagination={false}
-          locale={{
-            emptyText: (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="No workloads found"
-              >
-                <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-                  Create Your First Workload
-                </Button>
-              </Empty>
-            ),
-          }}
+        <Tabs
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          items={[
+            {
+              key: 'memtier',
+              label: (
+                <span>
+                  <ThunderboltOutlined />
+                  memtier_benchmark
+                </span>
+              ),
+              children: <MemtierPane />,
+            },
+            {
+              key: 'ann',
+              label: (
+                <span>
+                  <RadarChartOutlined />
+                  ann_benchmarks
+                </span>
+              ),
+              children: <AnnPane />,
+            },
+          ]}
         />
       </Card>
 
-      {/* Workload Editor Modal */}
+      {/* Memtier Workload Editor Modal */}
       <Modal
         title={editingWorkload ? 'Edit Workload' : 'Create Workload'}
         open={modalOpen}
@@ -608,6 +952,89 @@ export default function Workloads() {
 
           <Text type="secondary" style={{ display: 'block', marginTop: 16 }}>
             💡 Execution settings (threads, clients, duration, pipeline) have moved to <strong>Run Profiles</strong>.
+          </Text>
+        </Form>
+      </Modal>
+
+      {/* ANN Benchmarks Workload Editor Modal */}
+      <Modal
+        title={editingAnnWorkload ? 'Edit ANN Workload' : 'Create ANN Workload'}
+        open={annModalOpen}
+        onCancel={() => setAnnModalOpen(false)}
+        onOk={handleSaveAnn}
+        width={700}
+        okText={editingAnnWorkload ? 'Update' : 'Create'}
+      >
+        <Form form={annForm} layout="vertical">
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="name"
+                label="Workload Name"
+                rules={[
+                  { required: true, message: 'Please enter a name' },
+                  { pattern: /^[a-z0-9-]+$/, message: 'Only lowercase letters, numbers, and hyphens' }
+                ]}
+              >
+                <Input placeholder="my-ann-workload" disabled={!!editingAnnWorkload} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="dataset" label="Dataset" rules={[{ required: true }]}>
+                <Select onChange={handleDatasetChange}>
+                  {ANN_DATASETS.map(d => (
+                    <Option key={d.value} value={d.value}>{d.label}</Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item name="description" label="Description">
+            <TextArea rows={2} placeholder="Describe what this workload tests..." />
+          </Form.Item>
+
+          <Divider>Vector Configuration</Divider>
+
+          <Row gutter={16}>
+            <Col span={8}>
+              <Form.Item name="distance_metric" label="Distance Metric" rules={[{ required: true }]}>
+                <Select>
+                  {DISTANCE_METRICS.map(m => (
+                    <Option key={m.value} value={m.value}>{m.label}</Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="dimensions" label="Dimensions" rules={[{ required: true }]}>
+                <InputNumber min={1} max={10000} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="k" label="K (Neighbors)" rules={[{ required: true }]} tooltip="Number of nearest neighbors to return">
+                <InputNumber min={1} max={1000} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Divider>HNSW Index Parameters</Divider>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="m" label="M (Max connections per layer)" tooltip="Higher M = better recall but more memory">
+                <InputNumber min={2} max={100} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="ef_construction" label="ef_construction" tooltip="Higher = better index quality but slower build">
+                <InputNumber min={10} max={1000} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Text type="secondary" style={{ display: 'block', marginTop: 16 }}>
+            💡 Query-time parameters like ef_search are configured in <strong>Run Profiles</strong>.
           </Text>
         </Form>
       </Modal>

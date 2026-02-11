@@ -110,11 +110,32 @@ func showRun(cmd *cobra.Command, args []string) error {
 	fmt.Println("  ───────────")
 	if run.Environment != nil {
 		fmt.Printf("    Fingerprint:  %s\n", run.Environment.Fingerprint)
-		fmt.Printf("    OS:           %s/%s\n", run.Environment.OS, run.Environment.Arch)
-		fmt.Printf("    CPU:          %s (%d cores)\n", run.Environment.CPUModel, run.Environment.CPUCores)
-		fmt.Printf("    Memory:       %.1f GB\n", run.Environment.MemoryGB)
-		if run.Environment.RedisVersion != "" {
-			fmt.Printf("    Redis:        %s\n", run.Environment.RedisVersion)
+		if run.Environment.Host != nil {
+			fmt.Printf("    OS:           %s/%s\n", run.Environment.Host.OS, run.Environment.Host.Arch)
+			fmt.Printf("    CPU:          %s (%d cores)\n", run.Environment.Host.CPUModel, run.Environment.Host.CPUs)
+			fmt.Printf("    Memory:       %.1f GB\n", run.Environment.Host.MemoryGB)
+		}
+		if run.Environment.Redis != nil && run.Environment.Redis.Version != "" {
+			fmt.Printf("    Redis:        %s\n", run.Environment.Redis.Version)
+			if run.Environment.Redis.Mode != "" {
+				fmt.Printf("    Redis Mode:   %s\n", run.Environment.Redis.Mode)
+			}
+			if run.Environment.Redis.MemoryUsed > 0 {
+				fmt.Printf("    Redis Memory: %.2f MB used", float64(run.Environment.Redis.MemoryUsed)/(1024*1024))
+				if run.Environment.Redis.MemoryMax > 0 {
+					fmt.Printf(" / %.2f MB max", float64(run.Environment.Redis.MemoryMax)/(1024*1024))
+				}
+				fmt.Println()
+			}
+			if run.Environment.Redis.ConnectedClients > 0 {
+				fmt.Printf("    Redis Clients: %d connected\n", run.Environment.Redis.ConnectedClients)
+			}
+			if run.Environment.Redis.TotalKeys > 0 {
+				fmt.Printf("    Redis Keys:   %d total\n", run.Environment.Redis.TotalKeys)
+			}
+			if run.Environment.Redis.EvictedKeys > 0 {
+				fmt.Printf("    Evicted Keys: %d\n", run.Environment.Redis.EvictedKeys)
+			}
 		}
 		if run.Environment.NetworkLatencyMs > 0 {
 			fmt.Printf("    Net Latency:  %.2f ms\n", run.Environment.NetworkLatencyMs)

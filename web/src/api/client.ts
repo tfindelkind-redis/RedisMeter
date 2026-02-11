@@ -211,7 +211,10 @@ class ApiClient {
     name?: string;
     description?: string;
     target: { host: string; port: number; password?: string; tls?: boolean; cluster?: boolean };
-    workload: string;
+    tool?: string;
+    workload?: string;
+    run_profile?: string;
+    tool_config?: Record<string, unknown>;
     duration?: string;
     threads?: number;
     clients?: number;
@@ -237,14 +240,12 @@ class ApiClient {
   // Comparison
   async compare(
     runId: string,
-    baselineId?: string,
-    otherRunId?: string
+    baselineOrOtherRunId: string
   ): Promise<ComparisonResult> {
-    const params: Record<string, string> = { run_id: runId };
-    if (baselineId) params.baseline_id = baselineId;
-    if (otherRunId) params.other_run_id = otherRunId;
-    
-    const response = await this.client.get('/compare', { params });
+    const response = await this.client.post('/compare', {
+      run_id_1: runId,
+      run_id_2: baselineOrOtherRunId,
+    });
     return response.data;
   }
 
@@ -331,8 +332,12 @@ class ApiClient {
   // Run benchmark on infrastructure
   async runCloudBenchmark(config: {
     infrastructure_id: string;
+    name?: string;
+    description?: string;
+    tool?: string;
     workload?: string;
     run_profile?: string;
+    tool_config?: Record<string, unknown>;
     requests?: number;
     clients?: number;
     threads?: number;
@@ -341,8 +346,23 @@ class ApiClient {
     key_pattern?: string;
     data_size?: number;
     ratio?: string;
+    tags?: string[];
   }): Promise<{ id: string; benchmark_id?: string; status: string; message?: string }> {
     const response = await this.client.post('/cloud/benchmark', config);
+    return response.data;
+  }
+
+  // Get available benchmark tools and their status
+  async getBenchmarkTools(): Promise<{
+    tools: Array<{
+      id: string;
+      name: string;
+      available: boolean;
+      version?: string;
+      path?: string;
+    }>;
+  }> {
+    const response = await this.client.get('/benchmark/tools');
     return response.data;
   }
 }

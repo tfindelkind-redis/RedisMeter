@@ -225,9 +225,11 @@ func createTestRun(id string) *domain.BenchmarkRun {
 			Port: 6379,
 		},
 		Environment: &domain.Environment{
-			OS:       "darwin",
-			Arch:     "arm64",
-			Hostname: "test-host",
+			Host: &domain.HostInfo{
+				OS:       "darwin",
+				Arch:     "arm64",
+				Hostname: "test-host",
+			},
 		},
 		Results: &domain.Results{
 			Summary: &domain.SummaryMetrics{

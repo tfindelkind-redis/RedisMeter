@@ -75,25 +75,73 @@ export interface Environment {
   host?: HostInfo;
   redis?: RedisInfo;
   fingerprint?: string;
+  network_latency_ms?: number;
+  redismeter_version?: string;
+  memtier_version?: string;
 }
 
 export interface HostInfo {
   hostname?: string;
   os?: string;
   arch?: string;
+  kernel_version?: string;
+  cpu_model?: string;
   cpus?: number;
   memory_gb?: number;
 }
 
 export interface RedisInfo {
+  // Server info
   version?: string;
   mode?: string;
   os?: string;
   arch?: string;
+  uptime_seconds?: number;
+
+  // Memory
   memory_used?: number;
   memory_max?: number;
+  memory_peak?: number;
+  memory_frag_ratio?: number;
+  memory_eviction_policy?: string;
+
+  // Clients
   connected_clients?: number;
+  blocked_clients?: number;
+
+  // Stats
+  total_connections_received?: number;
+  total_commands_processed?: number;
+  instantaneous_ops_per_sec?: number;
+  evicted_keys?: number;
+  expired_keys?: number;
+  keyspace_hits?: number;
+  keyspace_misses?: number;
+
+  // Persistence
+  rdb_enabled?: boolean;
+  aof_enabled?: boolean;
+  rdb_last_save_time?: number;
+  rdb_last_bgsave_status?: string;
+
+  // Replication
+  role?: string;
+  connected_slaves?: number;
+
+  // Cluster
   cluster_enabled?: boolean;
+  cluster_size?: number;
+
+  // Keyspace
+  total_keys?: number;
+  total_expires?: number;
+  keyspace?: Record<string, string>;
+
+  // Modules
+  modules?: string[];
+
+  // Raw config
+  config?: Record<string, string>;
 }
 
 export interface Results {
@@ -274,8 +322,10 @@ export interface BenchmarkConfig {
     tls?: boolean;
     cluster?: boolean;
   };
-  workload: string;
+  tool?: BenchmarkToolType;
+  workload?: string;
   run_profile?: string;
+  tool_config?: Record<string, unknown>;
   // Optional overrides (when specified, override run_profile settings)
   threads?: number;
   clients?: number;
@@ -287,7 +337,78 @@ export interface BenchmarkConfig {
 // Infrastructure Management Types
 // ============================================
 
-export type CloudProvider = 'azure' | 'aws' | 'gcp' | 'kubernetes' | 'vmware' | 'local';
+export type CloudProvider = 'azure' | 'aws' | 'gcp' | 'kubernetes' | 'vmware' | 'local' | 'self_managed';
+
+// ============================================
+// Self-Managed Infrastructure Types
+// ============================================
+
+// SSH Authentication method
+export type SSHAuthMethod = 'password' | 'key' | 'key_file';
+
+// SSH Credentials for connecting to runner machines
+export interface SSHCredentials {
+  auth_method: SSHAuthMethod;
+  username: string;
+  // Password authentication (encrypted)
+  password?: string;
+  // SSH key authentication
+  private_key?: string; // PEM-encoded private key content (encrypted)
+  private_key_path?: string; // Path to private key file on server
+  passphrase?: string; // Passphrase for encrypted private key (encrypted)
+  // Connection settings
+  port?: number; // Default: 22
+  connect_timeout_seconds?: number; // Default: 30
+  strict_host_key_checking?: boolean;
+}
+
+// Redis Authentication credentials
+export interface RedisCredentials {
+  username?: string; // Default: 'default' for ACL, empty for legacy
+  password?: string; // Redis password (encrypted)
+  tls_enabled?: boolean;
+  tls_skip_verify?: boolean; // Skip TLS certificate verification
+  tls_cert?: string; // Client certificate (for mTLS)
+  tls_key?: string; // Client private key (for mTLS)
+  tls_ca?: string; // CA certificate for verification
+}
+
+// Runner machine definition for self-managed infrastructure
+export interface RunnerMachine {
+  id: string;
+  name?: string; // Friendly name for the runner
+  host: string; // IP address or hostname
+  ssh_port?: number; // Override default SSH port
+  labels?: Record<string, string>; // Custom labels for runner selection
+  available?: boolean; // Set by health check
+  last_health_check?: string;
+}
+
+// Redis target for self-managed infrastructure
+export interface RedisTarget {
+  id: string;
+  name?: string; // Friendly name
+  host: string; // IP address or hostname
+  port: number; // Default: 6379
+  is_cluster?: boolean;
+  cluster_nodes?: string[]; // Additional cluster nodes (host:port)
+}
+
+// Self-managed infrastructure configuration
+export interface SelfManagedConfig {
+  // Runner machines
+  runners: RunnerMachine[];
+  ssh_credentials: SSHCredentials;
+  
+  // Redis target(s)
+  redis_targets: RedisTarget[];
+  redis_credentials: RedisCredentials;
+  
+  // Benchmark tool paths (on runners)
+  memtier_path?: string; // Default: memtier_benchmark
+  redis_cli_path?: string; // Default: redis-cli
+  custom_tools?: Record<string, string>; // tool_name -> path
+}
 
 export type InfraStatus = 'pending' | 'provisioning' | 'ready' | 'failed' | 'destroying' | 'destroyed';
 
@@ -319,6 +440,7 @@ export interface InfraConfig {
   aws?: AWSConfig;
   gcp?: GCPConfig;
   kubernetes?: KubernetesConfig;
+  self_managed?: SelfManagedConfig;
 }
 
 // Azure Managed Redis Config
@@ -447,7 +569,7 @@ export interface ProviderFormProps {
 // Infrastructure Profiles
 // ==========================================
 
-export type InfraProfileProvider = 'azure' | 'aws' | 'gcp' | 'local' | 'custom';
+export type InfraProfileProvider = 'azure' | 'aws' | 'gcp' | 'local' | 'custom' | 'self_managed';
 
 export interface InfraProfile {
   id: string;
@@ -468,25 +590,103 @@ export interface InfraProfileConfig {
   gcp?: GCPInfraConfig;
   local?: LocalInfraConfig;
   custom?: CustomInfraConfig;
+  self_managed?: SelfManagedInfraConfig;
+}
+
+// Self-managed infrastructure profile configuration
+export interface SelfManagedInfraConfig {
+  // Runner machines
+  runners: {
+    machines: Array<{
+      name?: string;
+      host: string;
+      port?: number;
+      labels?: Record<string, string>;
+    }>;
+    ssh: {
+      auth_method: 'password' | 'key' | 'key_file';
+      username: string;
+      password_encrypted?: string;
+      private_key_encrypted?: string;
+      private_key_path?: string;
+      passphrase_encrypted?: string;
+      port?: number;
+      connect_timeout?: number;
+      strict_host_key_checking?: boolean;
+    };
+  };
+  // Redis target configuration
+  redis: {
+    targets: Array<{
+      name?: string;
+      host: string;
+      port: number;
+      is_cluster?: boolean;
+      cluster_nodes?: string[];
+    }>;
+    credentials: {
+      username?: string;
+      password_encrypted?: string;
+      tls_enabled?: boolean;
+      tls_skip_verify?: boolean;
+      tls_cert?: string;
+      tls_key_encrypted?: string;
+      tls_ca?: string;
+    };
+  };
+  // Tool paths on runners
+  tool_paths?: Record<string, string>;
 }
 
 export interface AzureInfraConfig {
   subscription_id?: string;
   resource_group?: string;
   location: string;
-  // Redis configuration
-  sku: string;
-  family?: string;
-  capacity: number;
-  shard_count?: number;
-  redis_version?: string;
-  enable_non_ssl_port?: boolean;
-  minimum_tls_version?: string;
-  public_network_access?: string;
+  
+  // Instance name (without .redis.azure.net suffix)
+  instance_name?: string;
+  
+  // Performance tier configuration
+  data_tier?: string; // "in-memory" (default) or "flash"
+  
+  // Azure Managed Redis configuration
+  sku: string; // Family_Size format (e.g., Balanced_B5)
+  high_availability?: boolean;
+  persistence_type?: string; // "", "rdb", "aof"
+  rdb_frequency?: string; // "1h", "6h", "12h"
+  aof_frequency?: string; // "1s", "always"
+  modules?: string[]; // RedisJSON, RediSearch, RedisBloom, RedisTimeSeries
+  
+  // Advanced settings
+  eviction_policy?: string; // noeviction, allkeys-lru, volatile-lru, etc.
+  clustering_policy?: string; // non-clustered, oss, enterprise
+  non_tls_access_only?: boolean;
+  access_keys_auth?: boolean;
+  customer_managed_key?: boolean;
+  defer_version_updates?: boolean;
+  
+  // Customer-managed key configuration (when customer_managed_key=true)
+  user_assigned_identity_id?: string; // Resource ID of user-assigned managed identity
+  key_input_method?: string; // "select" or "uri"
+  // For "select" method:
+  key_vault_subscription_id?: string; // Subscription ID containing the Key Vault
+  key_vault_name?: string; // Name of the Key Vault
+  key_name?: string; // Name of the encryption key (RSA)
+  key_version?: string; // Optional: specific key version (empty = latest)
+  // For "uri" method:
+  key_identifier_uri?: string; // Full key identifier URI (e.g., https://vault.vault.azure.net/keys/keyname/version)
+  
+  // Active geo-replication
+  active_geo_replication?: boolean;
+  geo_replication_group_name?: string;
+  
+  // Networking
+  use_private_endpoint?: boolean;
+  allow_public_access?: boolean;
+  
   // Benchmark VM configuration
   vm_size?: string;
   vm_count?: number;
-  use_spot_vms?: boolean;
   ssh_key_path?: string;
   estimated_monthly_cost?: number;
 }
@@ -557,4 +757,122 @@ export interface InfraProfileStats {
   most_used?: InfraProfile;
   recently_created?: InfraProfile;
   recently_used?: InfraProfile;
+}
+
+// ============================================
+// Benchmark Tools Types
+// ============================================
+
+// Supported benchmark tools
+export type BenchmarkToolType = 
+  | 'memtier_benchmark'   // Classic Redis benchmark tool (GET/SET, basic commands)
+  | 'ann_benchmarks'      // Vector/ANN performance (HNSW, vector search)
+  | 'ftsb'               // Full-text search benchmark (RediSearch)
+  | 'vectordb_bench';    // VectorDBBench for comprehensive vector testing
+
+// Benchmark tool metadata
+export interface BenchmarkTool {
+  id: BenchmarkToolType;
+  name: string;
+  description: string;
+  icon?: string;
+  category: 'core' | 'search' | 'vector';
+  supported_workloads: string[];
+  requires_module?: string[];  // Redis modules required (e.g., 'search', 'json')
+  documentation_url?: string;
+  available: boolean;  // Whether this tool is installed/available
+  version?: string;
+}
+
+// Tool-specific configuration interfaces
+
+export interface MemtierConfig {
+  threads: number;
+  clients: number;
+  pipeline: number;
+  duration?: string;
+  requests?: number;
+  ratio?: string;  // e.g., "1:10" for SET:GET
+  data_size?: number;
+  key_pattern?: string;
+  key_prefix?: string;
+  random_data?: boolean;
+  distinct_client_seed?: boolean;
+  protocol?: 'redis' | 'resp3';
+  hide_histogram?: boolean;
+  json_out_file?: string;
+}
+
+export interface ANNBenchmarksConfig {
+  algorithm: string;  // e.g., 'redis', 'hnsw'
+  dataset: string;    // e.g., 'glove-100-angular', 'sift-128-euclidean'
+  k: number;          // Number of nearest neighbors
+  runs: number;       // Number of benchmark runs
+  batch_mode?: boolean;
+  parallelism?: number;
+  // HNSW-specific parameters
+  ef_construction?: number;
+  ef_search?: number;
+  m?: number;
+}
+
+export interface FTSBConfig {
+  use_case: 'nyc_taxis' | 'enwiki_abstract' | 'enwiki_pages' | 'ecommerce_inventory' | 'custom';
+  workers: number;
+  pipeline: number;
+  duration?: string;
+  requests?: number;
+  rate_limit?: number;
+  cluster_mode?: boolean;
+  // Data generation
+  doc_count?: number;
+  query_count?: number;
+}
+
+export interface VectorDBBenchConfig {
+  case_type: string;  // e.g., 'Performance768D1M', 'CapacityDim960'
+  k: number;
+  concurrency: number[];
+  drop_old?: boolean;
+  load?: boolean;
+  search_serial?: boolean;
+  search_concurrent?: boolean;
+  // Index parameters
+  m?: number;
+  ef_construction?: number;
+  ef_search?: number;
+}
+
+// Union type for all tool configs
+export type ToolConfig = 
+  | { tool: 'memtier_benchmark'; config: MemtierConfig }
+  | { tool: 'ann_benchmarks'; config: ANNBenchmarksConfig }
+  | { tool: 'ftsb'; config: FTSBConfig }
+  | { tool: 'vectordb_bench'; config: VectorDBBenchConfig };
+
+// Extended benchmark configuration with tool support
+export interface BenchmarkConfigV2 {
+  name?: string;
+  description?: string;
+  tool: BenchmarkToolType;
+  target: {
+    host: string;
+    port: number;
+    password?: string;
+    tls?: boolean;
+    cluster?: boolean;
+  };
+  workload?: string;        // For memtier/ftsb
+  run_profile?: string;     // For memtier
+  tool_config?: ToolConfig['config'];  // Tool-specific configuration
+  tags?: string[];
+}
+
+// Benchmark tool availability check result
+export interface ToolAvailability {
+  tool: BenchmarkToolType;
+  available: boolean;
+  version?: string;
+  path?: string;
+  error?: string;
 }

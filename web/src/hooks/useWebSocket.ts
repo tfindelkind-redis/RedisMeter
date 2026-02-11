@@ -49,10 +49,17 @@ export default function useWebSocket(benchmarkId: string | null) {
 export function useGlobalWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number>();
+  const pingIntervalRef = useRef<number>();
   const reconnectAttempts = useRef(0);
   const { setWsConnected, setActiveBenchmark, refreshRun } = useStore();
 
   const connect = useCallback(() => {
+    // Clean up any existing connection
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/api/v1/ws`;
 
@@ -61,24 +68,42 @@ export function useGlobalWebSocket() {
     ws.onopen = () => {
       console.log('WebSocket connected');
       setWsConnected(true);
-      reconnectAttempts.current = 0; // Reset on successful connection
+      reconnectAttempts.current = 0;
+      
+      // Start ping interval to keep connection alive (every 25 seconds)
+      if (pingIntervalRef.current) {
+        clearInterval(pingIntervalRef.current);
+      }
+      pingIntervalRef.current = window.setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'ping' }));
+        }
+      }, 25000);
     };
 
-    ws.onclose = () => {
-      console.log('WebSocket disconnected');
-      setWsConnected(false);
-      // Exponential backoff with max 30 second delay, max 5 attempts
-      if (reconnectAttempts.current < 5) {
-        const delay = Math.min(3000 * Math.pow(2, reconnectAttempts.current), 30000);
-        reconnectAttempts.current++;
-        reconnectTimeoutRef.current = window.setTimeout(() => {
-          connect();
-        }, delay);
+    ws.onclose = (event) => {
+      // Clear ping interval
+      if (pingIntervalRef.current) {
+        clearInterval(pingIntervalRef.current);
+        pingIntervalRef.current = undefined;
       }
+      
+      // Don't log normal closures (1000) or going away (1001)
+      if (event.code !== 1000 && event.code !== 1001) {
+        console.log('WebSocket disconnected, code:', event.code);
+      }
+      setWsConnected(false);
+      
+      // Always retry with exponential backoff
+      const delay = Math.min(1000 * Math.pow(1.5, reconnectAttempts.current), 30000);
+      reconnectAttempts.current++;
+      reconnectTimeoutRef.current = window.setTimeout(() => {
+        connect();
+      }, delay);
     };
 
     ws.onerror = () => {
-      // Suppress error logging - connection failures are handled by onclose
+      // Errors are handled by onclose - suppress console noise
     };
 
     ws.onmessage = (event) => {
@@ -151,11 +176,17 @@ export function useGlobalWebSocket() {
     connect();
 
     return () => {
+      // Clean up on unmount
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
+      if (pingIntervalRef.current) {
+        clearInterval(pingIntervalRef.current);
+      }
       if (wsRef.current) {
-        wsRef.current.close();
+        // Use code 1000 for normal closure to avoid reconnect
+        wsRef.current.close(1000, 'Component unmounting');
+        wsRef.current = null;
       }
     };
   }, [connect]);
