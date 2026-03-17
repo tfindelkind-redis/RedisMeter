@@ -14,7 +14,7 @@ func TestCapture(t *testing.T) {
 		Host: "localhost",
 		Port: 6379,
 	}
-	
+
 	env, err := capturer.Capture(context.Background(), target)
 	if err != nil {
 		t.Fatalf("Capture() error = %v", err)
@@ -90,7 +90,7 @@ func TestCaptureWithInvalidRedis(t *testing.T) {
 		Host: "invalid-host-xxx",
 		Port: 9999,
 	}
-	
+
 	// Capture with invalid Redis should still work (just won't have Redis info)
 	env, err := capturer.Capture(context.Background(), target)
 	// Should not error - it should just skip Redis info
@@ -115,7 +115,7 @@ func TestFingerprintConsistency(t *testing.T) {
 		Host: "localhost",
 		Port: 6379,
 	}
-	
+
 	// Same environment should produce same fingerprint
 	env1, err := capturer.Capture(context.Background(), target)
 	if err != nil {
@@ -128,7 +128,7 @@ func TestFingerprintConsistency(t *testing.T) {
 	}
 
 	if env1.Fingerprint != env2.Fingerprint {
-		t.Errorf("Fingerprints should be identical:\n  env1: %s\n  env2: %s", 
+		t.Errorf("Fingerprints should be identical:\n  env1: %s\n  env2: %s",
 			env1.Fingerprint, env2.Fingerprint)
 	}
 }
@@ -139,7 +139,7 @@ func TestCapturedMetadata(t *testing.T) {
 		Host: "localhost",
 		Port: 6379,
 	}
-	
+
 	env, err := capturer.Capture(context.Background(), target)
 	if err != nil {
 		t.Fatalf("Capture() error = %v", err)

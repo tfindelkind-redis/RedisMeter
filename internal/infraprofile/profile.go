@@ -115,11 +115,11 @@ type AzureConfig struct {
 	KeyName                string `json:"key_name,omitempty"`                  // Name of the encryption key (RSA)
 	KeyVersion             string `json:"key_version,omitempty"`               // Optional: specific key version (empty = latest)
 	// For "uri" method:
-	KeyIdentifierURI       string `json:"key_identifier_uri,omitempty"`        // Full key identifier URI
+	KeyIdentifierURI string `json:"key_identifier_uri,omitempty"` // Full key identifier URI
 
 	// Active geo-replication (requires cache size >= 3GB)
-	ActiveGeoReplication     bool   `json:"active_geo_replication,omitempty"`
-	GeoReplicationGroupName  string `json:"geo_replication_group_name,omitempty"`
+	ActiveGeoReplication    bool   `json:"active_geo_replication,omitempty"`
+	GeoReplicationGroupName string `json:"geo_replication_group_name,omitempty"`
 
 	// Networking
 	UsePrivateEndpoint bool `json:"use_private_endpoint,omitempty"`

@@ -48,7 +48,7 @@ func createTestRun() *domain.BenchmarkRun {
 			},
 		},
 		Environment: &domain.Environment{
-			Fingerprint:       "abc123",
+			Fingerprint: "abc123",
 			Host: &domain.HostInfo{
 				Hostname: "test-host",
 				OS:       "linux",

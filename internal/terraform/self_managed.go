@@ -221,19 +221,19 @@ func (m *Manager) GetDecryptedSSHCredentials(id string) (*SSHCredentials, error)
 
 	// Decrypt sensitive fields
 	creds := config.Runners.SSH
-	
+
 	if creds.PasswordEncrypted != "" {
 		if decrypted, err := DecryptCredential(creds.PasswordEncrypted, encryptionKey); err == nil {
 			creds.PasswordEncrypted = decrypted // Store decrypted value temporarily
 		}
 	}
-	
+
 	if creds.PrivateKeyEncrypted != "" {
 		if decrypted, err := DecryptCredential(creds.PrivateKeyEncrypted, encryptionKey); err == nil {
 			creds.PrivateKeyEncrypted = decrypted
 		}
 	}
-	
+
 	if creds.PassphraseEncrypted != "" {
 		if decrypted, err := DecryptCredential(creds.PassphraseEncrypted, encryptionKey); err == nil {
 			creds.PassphraseEncrypted = decrypted
@@ -262,13 +262,13 @@ func (m *Manager) GetDecryptedRedisCredentials(id string) (*RedisCredentials, er
 
 	// Decrypt sensitive fields
 	creds := config.Redis.Credentials
-	
+
 	if creds.PasswordEncrypted != "" {
 		if decrypted, err := DecryptCredential(creds.PasswordEncrypted, encryptionKey); err == nil {
 			creds.PasswordEncrypted = decrypted
 		}
 	}
-	
+
 	if creds.TLSKeyEncrypted != "" {
 		if decrypted, err := DecryptCredential(creds.TLSKeyEncrypted, encryptionKey); err == nil {
 			creds.TLSKeyEncrypted = decrypted

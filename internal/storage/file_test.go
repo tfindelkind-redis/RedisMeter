@@ -15,7 +15,7 @@ func TestFileStorage(t *testing.T) {
 	// Create temp directory for tests
 	tmpDir := t.TempDir()
 	ctx := context.Background()
-	
+
 	storage, err := NewFileStorage(tmpDir)
 	if err != nil {
 		t.Fatalf("NewFileStorage() error = %v", err)
@@ -233,10 +233,10 @@ func createTestRun(id string) *domain.BenchmarkRun {
 		},
 		Results: &domain.Results{
 			Summary: &domain.SummaryMetrics{
-				TotalOps:     100000,
-				AvgLatencyMs: 1.5,
-				P50LatencyMs: 1.2,
-				P99LatencyMs: 3.5,
+				TotalOps:      100000,
+				AvgLatencyMs:  1.5,
+				P50LatencyMs:  1.2,
+				P99LatencyMs:  3.5,
 				P999LatencyMs: 5.0,
 			},
 		},

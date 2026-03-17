@@ -78,6 +78,17 @@ const BENCHMARK_TOOLS: BenchmarkTool[] = [
     documentation_url: 'https://github.com/RedisLabs/memtier_benchmark',
   },
   {
+    id: 'vector_db_benchmark',
+    name: 'Vector DB Benchmark',
+    description: 'Redis vector search benchmarking using redis/vector-db-benchmark. Tests RediSearch HNSW and VectorSets with standard datasets.',
+    icon: 'radar',
+    category: 'vector',
+    supported_workloads: ['vector-search', 'hnsw', 'similarity', 'filtered-search'],
+    requires_module: ['search'],
+    available: true,
+    documentation_url: 'https://github.com/redis/vector-db-benchmark',
+  },
+  {
     id: 'ann_benchmarks',
     name: 'ANN Benchmarks',
     description: 'Industry-standard vector search benchmarking. Measures recall vs QPS tradeoffs for HNSW and other ANN algorithms.',
@@ -85,7 +96,7 @@ const BENCHMARK_TOOLS: BenchmarkTool[] = [
     category: 'vector',
     supported_workloads: ['vector-search', 'hnsw', 'similarity'],
     requires_module: ['search'],
-    available: true,
+    available: false, // Coming soon
     documentation_url: 'https://github.com/erikbern/ann-benchmarks',
   },
   {
@@ -169,6 +180,14 @@ interface FormValues {
   vdb_ef_search?: number;
   vdb_drop_old?: boolean;
   vdb_load?: boolean;
+  // Vector DB Benchmark (redis/vector-db-benchmark) config
+  vbm_dataset?: string;
+  vbm_engine?: string;
+  vbm_k?: number;
+  vbm_ef_runtime?: number;
+  vbm_parallelism?: number;
+  vbm_upload_only?: boolean;
+  vbm_search_only?: boolean;
 }
 
 export default function NewBenchmark() {
@@ -304,6 +323,16 @@ export default function NewBenchmark() {
           ef_search: values.vdb_ef_search,
           drop_old: values.vdb_drop_old,
           load: values.vdb_load,
+        };
+      } else if (selectedTool === 'vector_db_benchmark') {
+        toolConfig = {
+          dataset: values.vbm_dataset,
+          engine: values.vbm_engine,
+          k: values.vbm_k,
+          ef_runtime: values.vbm_ef_runtime,
+          parallelism: values.vbm_parallelism,
+          upload_only: values.vbm_upload_only,
+          search_only: values.vbm_search_only,
         };
       }
 
@@ -520,37 +549,48 @@ export default function NewBenchmark() {
         <Row gutter={[16, 16]}>
           {BENCHMARK_TOOLS.map((tool) => (
             <Col xs={24} sm={12} lg={8} xl={6} key={tool.id}>
-              <Card
-                hoverable={tool.available}
-                size="small"
-                onClick={() => tool.available && setSelectedTool(tool.id)}
-                style={{
-                  border: selectedTool === tool.id ? '2px solid #DC382D' : '1px solid #333333',
-                  background: selectedTool === tool.id ? 'rgba(220, 56, 45, 0.15)' : tool.available ? '#1a1a1a' : '#0d0d0d',
-                  cursor: tool.available ? 'pointer' : 'not-allowed',
-                  height: '100%',
-                  opacity: tool.available ? 1 : 0.7,
-                }}
-                bodyStyle={{ padding: 16 }}
+              <Badge.Ribbon 
+                text={selectedTool === tool.id ? "Selected" : ""} 
+                color="#DC382D"
+                style={{ display: selectedTool === tool.id ? 'block' : 'none' }}
               >
-                <Space direction="vertical" size={8} style={{ width: '100%' }}>
-                  <Space>
-                    <span style={{ 
-                      fontSize: 24, 
-                      color: selectedTool === tool.id ? '#DC382D' : 'rgba(255,255,255,0.65)' 
-                    }}>
-                      {getToolIcon(tool)}
-                    </span>
-                    <Text strong style={{ 
-                      color: selectedTool === tool.id ? '#DC382D' : 'inherit' 
-                    }}>
-                      {tool.name}
-                    </Text>
-                    {!tool.available && (
-                      <Tag color="orange">Coming Soon</Tag>
-                    )}
-                  </Space>
-                  <Tag color={getCategoryColor(tool.category)}>{tool.category}</Tag>
+                <Card
+                  hoverable={tool.available}
+                  size="small"
+                  onClick={() => tool.available && setSelectedTool(tool.id)}
+                  style={{
+                    border: selectedTool === tool.id ? '2px solid #DC382D' : '1px solid #333333',
+                    background: selectedTool === tool.id ? 'rgba(220, 56, 45, 0.25)' : tool.available ? '#1a1a1a' : '#0d0d0d',
+                    cursor: tool.available ? 'pointer' : 'not-allowed',
+                    height: '100%',
+                    opacity: tool.available ? 1 : 0.7,
+                    boxShadow: selectedTool === tool.id ? '0 0 12px rgba(220, 56, 45, 0.4)' : 'none',
+                    transition: 'all 0.2s ease',
+                  }}
+                  bodyStyle={{ padding: 16 }}
+                >
+                  <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                    <Space>
+                      <span style={{ 
+                        fontSize: 24, 
+                        color: selectedTool === tool.id ? '#DC382D' : 'rgba(255,255,255,0.65)' 
+                      }}>
+                        {getToolIcon(tool)}
+                      </span>
+                      <Text strong style={{ 
+                        color: selectedTool === tool.id ? '#ffffff' : 'inherit',
+                        fontSize: selectedTool === tool.id ? 14 : 13,
+                      }}>
+                        {tool.name}
+                      </Text>
+                      {selectedTool === tool.id && (
+                        <CheckCircleOutlined style={{ color: '#DC382D', fontSize: 16 }} />
+                      )}
+                      {!tool.available && (
+                        <Tag color="orange">Coming Soon</Tag>
+                      )}
+                    </Space>
+                    <Tag color={getCategoryColor(tool.category)}>{tool.category}</Tag>
                   <Text type="secondary" style={{ fontSize: 12 }}>
                     {tool.description}
                   </Text>
@@ -576,6 +616,7 @@ export default function NewBenchmark() {
                   )}
                 </Space>
               </Card>
+              </Badge.Ribbon>
             </Col>
           ))}
         </Row>
@@ -592,6 +633,8 @@ export default function NewBenchmark() {
                   'FTSB will generate test data and queries based on the selected use case. Ensure RediSearch module is loaded.'}
                 {selectedTool === 'vectordb_bench' && 
                   'VectorDB Bench provides comprehensive vector search testing with various dataset sizes and configurations.'}
+                {selectedTool === 'vector_db_benchmark' && 
+                  'Vector DB Benchmark runs via Docker using redis/vector-db-benchmark. Select dataset and engine configuration below.'}
               </Text>
             }
             showIcon
@@ -875,6 +918,101 @@ export default function NewBenchmark() {
                         extra="HNSW parameter: max number of connections per node"
                       >
                         <InputNumber min={4} max={64} style={{ width: '100%' }} />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                </Card>
+              </Col>
+            )}
+
+            {/* Vector DB Benchmark Configuration */}
+            {selectedTool === 'vector_db_benchmark' && (
+              <Col xs={24}>
+                <Card 
+                  title={<><RadarChartOutlined /> Vector DB Benchmark Configuration</>}
+                  style={{ marginBottom: 24 }}
+                >
+                  <Row gutter={24}>
+                    <Col xs={24} lg={12}>
+                      <Form.Item
+                        name="vbm_dataset"
+                        label="Dataset"
+                        rules={[{ required: selectedTool === 'vector_db_benchmark', message: 'Please select a dataset' }]}
+                        extra="Standard benchmark datasets with ground truth"
+                      >
+                        <Select placeholder="Select dataset">
+                          <Option value="random-100">Random-100 (100 vectors, testing ~1 min)</Option>
+                          <Option value="glove-25-angular">GloVe-25 (1.2M vectors, ~5 min)</Option>
+                          <Option value="glove-100-angular">GloVe-100 (1.2M vectors, ~15 min)</Option>
+                          <Option value="gist-960-euclidean">GIST-960 (1M vectors, ~30 min)</Option>
+                          <Option value="deep-image-96-angular">Deep Image (10M vectors, ~45 min)</Option>
+                          <Option value="laion-small-clip">LAION Small (100K vectors, ~10 min)</Option>
+                          <Option value="dbpedia-openai-1m">DBpedia OpenAI (1M, 1536D, ~2 hours)</Option>
+                          <Option value="h-and-m-2048-filtered">H&M Fashion Filtered (105K, ~20 min)</Option>
+                          <Option value="arxiv-384-filtered">ArXiv Papers Filtered (2.2M, ~1 hour)</Option>
+                        </Select>
+                      </Form.Item>
+
+                      <Form.Item
+                        name="vbm_engine"
+                        label="Redis Engine"
+                        initialValue="redis-default-simple"
+                        extra="Redis vector search engine configuration"
+                      >
+                        <Select>
+                          <Option value="redis-default-simple">Redis RediSearch (default)</Option>
+                          <Option value="redis-hnsw-m-16-ef-200">Redis HNSW (M=16, ef=200)</Option>
+                          <Option value="redis-hnsw-m-32-ef-400">Redis HNSW (M=32, ef=400)</Option>
+                          <Option value="vectorsets-fp32-default">Redis VectorSets (FP32)</Option>
+                          <Option value="vectorsets-q8-default">Redis VectorSets (INT8)</Option>
+                        </Select>
+                      </Form.Item>
+
+                      <Form.Item
+                        name="vbm_k"
+                        label="K (Nearest Neighbors)"
+                        initialValue={10}
+                        extra="Number of nearest neighbors to retrieve"
+                      >
+                        <InputNumber min={1} max={1000} style={{ width: '100%' }} />
+                      </Form.Item>
+                    </Col>
+
+                    <Col xs={24} lg={12}>
+                      <Form.Item
+                        name="vbm_ef_runtime"
+                        label="ef_runtime"
+                        initialValue={10}
+                        extra="HNSW search parameter (higher = better recall, slower search)"
+                      >
+                        <InputNumber min={1} max={500} style={{ width: '100%' }} />
+                      </Form.Item>
+
+                      <Form.Item
+                        name="vbm_parallelism"
+                        label="Parallelism"
+                        initialValue={1}
+                        extra="Number of parallel search threads"
+                      >
+                        <InputNumber min={1} max={64} style={{ width: '100%' }} />
+                      </Form.Item>
+
+                      <Form.Item
+                        name="vbm_upload_only"
+                        label="Upload Only"
+                        valuePropName="checked"
+                        extra="Only upload data, skip search benchmark"
+                      >
+                        <Switch />
+                      </Form.Item>
+
+                      <Form.Item
+                        name="vbm_search_only"
+                        label="Search Only"
+                        valuePropName="checked"
+                        extra="Only run search benchmark (assumes data exists)"
+                      >
+                        <Switch />
                       </Form.Item>
                     </Col>
                   </Row>

@@ -1325,28 +1325,28 @@ func contains(slice []string, item string) bool {
 
 // InfraCreateRequest is the request body for creating infrastructure.
 type InfraCreateRequest struct {
-	Name        string                `json:"name"`
-	Provider    string                `json:"provider"`
-	Region      string                `json:"region"`
-	TTL         string                `json:"ttl,omitempty"`
-	Tags        map[string]string     `json:"tags,omitempty"`
-	AMR         *InfraAMRConfig       `json:"amr,omitempty"`
-	Runners     *InfraRunnerConfig    `json:"runners,omitempty"`
-	SelfManaged *SelfManagedConfig    `json:"self_managed,omitempty"`
-	EncryptionKey string              `json:"encryption_key,omitempty"` // For decrypting self-managed credentials
+	Name          string             `json:"name"`
+	Provider      string             `json:"provider"`
+	Region        string             `json:"region"`
+	TTL           string             `json:"ttl,omitempty"`
+	Tags          map[string]string  `json:"tags,omitempty"`
+	AMR           *InfraAMRConfig    `json:"amr,omitempty"`
+	Runners       *InfraRunnerConfig `json:"runners,omitempty"`
+	SelfManaged   *SelfManagedConfig `json:"self_managed,omitempty"`
+	EncryptionKey string             `json:"encryption_key,omitempty"` // For decrypting self-managed credentials
 }
 
 // SelfManagedConfig holds configuration for self-managed (BYOI) infrastructure.
 type SelfManagedConfig struct {
-	Runners    SelfManagedRunners    `json:"runners"`
-	Redis      SelfManagedRedis      `json:"redis"`
-	ToolPaths  map[string]string     `json:"tool_paths,omitempty"`
+	Runners   SelfManagedRunners `json:"runners"`
+	Redis     SelfManagedRedis   `json:"redis"`
+	ToolPaths map[string]string  `json:"tool_paths,omitempty"`
 }
 
 // SelfManagedRunners holds runner machine configuration.
 type SelfManagedRunners struct {
-	Machines []RunnerMachine       `json:"machines"`
-	SSH      SSHConfig             `json:"ssh"`
+	Machines []RunnerMachine `json:"machines"`
+	SSH      SSHConfig       `json:"ssh"`
 }
 
 // RunnerMachine represents a single runner machine.
@@ -1359,21 +1359,21 @@ type RunnerMachine struct {
 
 // SSHConfig holds SSH authentication configuration (credentials are encrypted).
 type SSHConfig struct {
-	AuthMethod           string `json:"auth_method"` // "password", "key", or "key_file"
-	Username             string `json:"username"`
-	Password             string `json:"password,omitempty"`              // Encrypted
-	PrivateKey           string `json:"private_key,omitempty"`           // Encrypted
-	PrivateKeyPath       string `json:"private_key_path,omitempty"`      // Path on server
-	Passphrase           string `json:"passphrase,omitempty"`            // Encrypted
-	Port                 int    `json:"port,omitempty"`                  // Default: 22
-	ConnectTimeout       int    `json:"connect_timeout,omitempty"`       // Default: 30
-	StrictHostKeyChecking bool  `json:"strict_host_key_checking,omitempty"`
+	AuthMethod            string `json:"auth_method"` // "password", "key", or "key_file"
+	Username              string `json:"username"`
+	Password              string `json:"password,omitempty"`         // Encrypted
+	PrivateKey            string `json:"private_key,omitempty"`      // Encrypted
+	PrivateKeyPath        string `json:"private_key_path,omitempty"` // Path on server
+	Passphrase            string `json:"passphrase,omitempty"`       // Encrypted
+	Port                  int    `json:"port,omitempty"`             // Default: 22
+	ConnectTimeout        int    `json:"connect_timeout,omitempty"`  // Default: 30
+	StrictHostKeyChecking bool   `json:"strict_host_key_checking,omitempty"`
 }
 
 // SelfManagedRedis holds Redis target configuration.
 type SelfManagedRedis struct {
-	Targets     []RedisTarget       `json:"targets"`
-	Credentials RedisCredentials    `json:"credentials"`
+	Targets     []RedisTarget    `json:"targets"`
+	Credentials RedisCredentials `json:"credentials"`
 }
 
 // RedisTarget represents a Redis instance to benchmark.
@@ -1388,11 +1388,11 @@ type RedisTarget struct {
 // RedisCredentials holds Redis authentication (password is encrypted).
 type RedisCredentials struct {
 	Username      string `json:"username,omitempty"`
-	Password      string `json:"password,omitempty"`        // Encrypted
+	Password      string `json:"password,omitempty"` // Encrypted
 	TLSEnabled    bool   `json:"tls_enabled,omitempty"`
 	TLSSkipVerify bool   `json:"tls_skip_verify,omitempty"`
 	TLSCert       string `json:"tls_cert,omitempty"`
-	TLSKey        string `json:"tls_key,omitempty"`         // Encrypted
+	TLSKey        string `json:"tls_key,omitempty"` // Encrypted
 	TLSCA         string `json:"tls_ca,omitempty"`
 }
 
@@ -1664,7 +1664,7 @@ func (s *Server) createSelfManagedInfrastructure(w http.ResponseWriter, req Infr
 
 	// Generate unique ID
 	id := fmt.Sprintf("rm-self-%s-%d", strings.ReplaceAll(req.Name, " ", "-"), time.Now().Unix())
-	
+
 	// Create state - self-managed infra is immediately ready
 	now := time.Now()
 	state := &terraform.InfraState{

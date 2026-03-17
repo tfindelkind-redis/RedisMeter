@@ -240,8 +240,8 @@ func (c *WebSocketConn) readPump() {
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
 			// Only log unexpected errors (not normal closes)
-			if websocket.IsUnexpectedCloseError(err, 
-				websocket.CloseGoingAway, 
+			if websocket.IsUnexpectedCloseError(err,
+				websocket.CloseGoingAway,
 				websocket.CloseAbnormalClosure,
 				websocket.CloseNormalClosure,
 				websocket.CloseNoStatusReceived) {
@@ -272,7 +272,7 @@ func (c *WebSocketConn) writePump() {
 			c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 			if !ok {
 				// Channel closed, send close message gracefully
-				c.conn.WriteMessage(websocket.CloseMessage, 
+				c.conn.WriteMessage(websocket.CloseMessage,
 					websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 				return
 			}

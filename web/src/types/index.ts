@@ -766,9 +766,10 @@ export interface InfraProfileStats {
 // Supported benchmark tools
 export type BenchmarkToolType = 
   | 'memtier_benchmark'   // Classic Redis benchmark tool (GET/SET, basic commands)
-  | 'ann_benchmarks'      // Vector/ANN performance (HNSW, vector search)
+  | 'ann_benchmarks'      // Vector/ANN performance (HNSW, vector search) - Coming Soon
   | 'ftsb'               // Full-text search benchmark (RediSearch)
-  | 'vectordb_bench';    // VectorDBBench for comprehensive vector testing
+  | 'vectordb_bench'     // VectorDBBench for comprehensive vector testing
+  | 'vector_db_benchmark'; // redis/vector-db-benchmark for vector search testing
 
 // Benchmark tool metadata
 export interface BenchmarkTool {
@@ -843,12 +844,23 @@ export interface VectorDBBenchConfig {
   ef_search?: number;
 }
 
+export interface VectorDBBenchmarkConfig {
+  dataset: string;          // e.g., 'glove-100-angular', 'gist-960-euclidean'
+  engine: string;           // e.g., 'redis-default-simple', 'redis-hnsw-m-16-ef-200'
+  k: number;                // Number of nearest neighbors to retrieve
+  ef_runtime?: number;      // HNSW search parameter
+  parallelism?: number;     // Number of parallel search threads
+  upload_only?: boolean;    // Only upload data, skip search benchmark
+  search_only?: boolean;    // Only run search benchmark
+}
+
 // Union type for all tool configs
 export type ToolConfig = 
   | { tool: 'memtier_benchmark'; config: MemtierConfig }
   | { tool: 'ann_benchmarks'; config: ANNBenchmarksConfig }
   | { tool: 'ftsb'; config: FTSBConfig }
-  | { tool: 'vectordb_bench'; config: VectorDBBenchConfig };
+  | { tool: 'vectordb_bench'; config: VectorDBBenchConfig }
+  | { tool: 'vector_db_benchmark'; config: VectorDBBenchmarkConfig };
 
 // Extended benchmark configuration with tool support
 export interface BenchmarkConfigV2 {

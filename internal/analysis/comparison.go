@@ -92,28 +92,28 @@ type MetricsDiff struct {
 	ThroughputDiff float64 `json:"throughput_diff"` // percentage change
 
 	// Latency (average)
-	AvgLatency1  float64 `json:"avg_latency_1"`
-	AvgLatency2  float64 `json:"avg_latency_2"`
+	AvgLatency1    float64 `json:"avg_latency_1"`
+	AvgLatency2    float64 `json:"avg_latency_2"`
 	AvgLatencyDiff float64 `json:"avg_latency_diff"`
 
 	// P50 Latency
-	P50Latency1  float64 `json:"p50_latency_1"`
-	P50Latency2  float64 `json:"p50_latency_2"`
+	P50Latency1    float64 `json:"p50_latency_1"`
+	P50Latency2    float64 `json:"p50_latency_2"`
 	P50LatencyDiff float64 `json:"p50_latency_diff"`
 
 	// P99 Latency
-	P99Latency1  float64 `json:"p99_latency_1"`
-	P99Latency2  float64 `json:"p99_latency_2"`
+	P99Latency1    float64 `json:"p99_latency_1"`
+	P99Latency2    float64 `json:"p99_latency_2"`
 	P99LatencyDiff float64 `json:"p99_latency_diff"`
 
 	// P999 Latency
-	P999Latency1  float64 `json:"p999_latency_1"`
-	P999Latency2  float64 `json:"p999_latency_2"`
+	P999Latency1    float64 `json:"p999_latency_1"`
+	P999Latency2    float64 `json:"p999_latency_2"`
 	P999LatencyDiff float64 `json:"p999_latency_diff"`
 
 	// Error rate
-	ErrorRate1  float64 `json:"error_rate_1"`
-	ErrorRate2  float64 `json:"error_rate_2"`
+	ErrorRate1    float64 `json:"error_rate_1"`
+	ErrorRate2    float64 `json:"error_rate_2"`
 	ErrorRateDiff float64 `json:"error_rate_diff"`
 }
 

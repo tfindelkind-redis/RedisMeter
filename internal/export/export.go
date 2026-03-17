@@ -88,14 +88,14 @@ func (e *Exporter) ExportRun(ctx context.Context, run *domain.BenchmarkRun, w io
 // prepareRunData converts a BenchmarkRun to a map for export.
 func (e *Exporter) prepareRunData(run *domain.BenchmarkRun) map[string]interface{} {
 	data := map[string]interface{}{
-		"id":         run.ID,
-		"created_at": run.CreatedAt.Format(time.RFC3339),
-		"updated_at": run.UpdatedAt.Format(time.RFC3339),
-		"status":     string(run.Status),
-		"name":       run.Name,
+		"id":          run.ID,
+		"created_at":  run.CreatedAt.Format(time.RFC3339),
+		"updated_at":  run.UpdatedAt.Format(time.RFC3339),
+		"status":      string(run.Status),
+		"name":        run.Name,
 		"description": run.Description,
-		"tags":       run.Tags,
-		"labels":     run.Labels,
+		"tags":        run.Tags,
+		"labels":      run.Labels,
 	}
 
 	if !run.StartTime.IsZero() {
@@ -133,19 +133,19 @@ func (e *Exporter) prepareRunData(run *domain.BenchmarkRun) map[string]interface
 	if run.Results != nil && run.Results.Summary != nil {
 		s := run.Results.Summary
 		data["results"] = map[string]interface{}{
-			"ops_per_second":   s.OpsPerSecond,
-			"avg_latency_ms":   s.AvgLatencyMs,
-			"min_latency_ms":   s.MinLatencyMs,
-			"max_latency_ms":   s.MaxLatencyMs,
-			"p50_latency_ms":   s.P50LatencyMs,
-			"p90_latency_ms":   s.P90LatencyMs,
-			"p95_latency_ms":   s.P95LatencyMs,
-			"p99_latency_ms":   s.P99LatencyMs,
-			"p999_latency_ms":  s.P999LatencyMs,
-			"errors":           s.Errors,
-			"error_rate":       s.ErrorRate,
-			"total_ops":        s.TotalOps,
-			"total_requests":   s.TotalRequests,
+			"ops_per_second":  s.OpsPerSecond,
+			"avg_latency_ms":  s.AvgLatencyMs,
+			"min_latency_ms":  s.MinLatencyMs,
+			"max_latency_ms":  s.MaxLatencyMs,
+			"p50_latency_ms":  s.P50LatencyMs,
+			"p90_latency_ms":  s.P90LatencyMs,
+			"p95_latency_ms":  s.P95LatencyMs,
+			"p99_latency_ms":  s.P99LatencyMs,
+			"p999_latency_ms": s.P999LatencyMs,
+			"errors":          s.Errors,
+			"error_rate":      s.ErrorRate,
+			"total_ops":       s.TotalOps,
+			"total_requests":  s.TotalRequests,
 		}
 
 		// Include by-operation breakdown
@@ -276,20 +276,20 @@ func (e *Exporter) exportCSV(runs []*domain.BenchmarkRun, w io.Writer) error {
 	// Write data rows
 	for _, run := range runs {
 		row := make([]string, len(csvHeaders))
-		
+
 		row[0] = run.ID
 		row[1] = run.CreatedAt.Format(time.RFC3339)
 		row[2] = string(run.Status)
-		
+
 		if run.Workload != nil {
 			row[3] = run.Workload.Name
 		}
-		
+
 		if run.Target != nil {
 			row[4] = run.Target.Host
 			row[5] = fmt.Sprintf("%d", run.Target.Port)
 		}
-		
+
 		if run.Results != nil && run.Results.Summary != nil {
 			s := run.Results.Summary
 			row[6] = fmt.Sprintf("%.2f", s.OpsPerSecond)
@@ -300,10 +300,10 @@ func (e *Exporter) exportCSV(runs []*domain.BenchmarkRun, w io.Writer) error {
 			row[11] = fmt.Sprintf("%d", s.Errors)
 			row[12] = fmt.Sprintf("%.4f", s.ErrorRate)
 		}
-		
+
 		row[13] = run.Duration
 		row[14] = run.Name
-		
+
 		if len(run.Tags) > 0 {
 			row[15] = fmt.Sprintf("%v", run.Tags)
 		}

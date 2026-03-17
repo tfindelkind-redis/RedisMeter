@@ -147,7 +147,7 @@ func (r *MarkdownReporter) Generate(ctx context.Context, report *Report, w io.Wr
 
 		sb.WriteString("| Metric | Run 1 | Run 2 | Change |\n")
 		sb.WriteString("|--------|-------|-------|--------|\n")
-		
+
 		if comp.Metrics != nil {
 			sb.WriteString(fmt.Sprintf("| Throughput | %.0f ops/sec | %.0f ops/sec | %s |\n",
 				comp.Metrics.OpsPerSecond1,

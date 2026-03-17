@@ -71,8 +71,8 @@ interface RunProfile {
 
 const PROTOCOLS = ['redis', 'resp2', 'resp3'];
 
-// ANN Benchmarks Run Profile types
-interface ANNRunProfile {
+// Vector DB Benchmark Run Profile types
+interface VectorRunProfile {
   name: string;
   description: string;
   ef_search: number;
@@ -80,6 +80,8 @@ interface ANNRunProfile {
   num_queries: number;
   num_runs: number;
   parallelism: number;
+  timeout_seconds: number;
+  upload_parallel: number;
   is_builtin?: boolean;
 }
 
@@ -92,19 +94,19 @@ export default function RunProfiles() {
   const [form] = Form.useForm();
   const [durationMode, setDurationMode] = useState<'duration' | 'requests'>('duration');
 
-  // ANN Benchmarks state
-  const [annProfiles, setAnnProfiles] = useState<ANNRunProfile[]>([]);
-  const [annLoading, setAnnLoading] = useState(true);
-  const [annModalOpen, setAnnModalOpen] = useState(false);
-  const [editingAnnProfile, setEditingAnnProfile] = useState<ANNRunProfile | null>(null);
-  const [annForm] = Form.useForm();
+  // Vector DB Benchmark state
+  const [vectorProfiles, setVectorProfiles] = useState<VectorRunProfile[]>([]);
+  const [vectorLoading, setVectorLoading] = useState(true);
+  const [vectorModalOpen, setVectorModalOpen] = useState(false);
+  const [editingVectorProfile, setEditingVectorProfile] = useState<VectorRunProfile | null>(null);
+  const [vectorForm] = Form.useForm();
 
   // Tab state
   const [activeTab, setActiveTab] = useState('memtier');
 
   useEffect(() => {
     loadProfiles();
-    loadAnnProfiles();
+    loadVectorProfiles();
   }, []);
 
   const loadProfiles = async () => {
@@ -119,46 +121,52 @@ export default function RunProfiles() {
     }
   };
 
-  const loadAnnProfiles = async () => {
+  const loadVectorProfiles = async () => {
     try {
       // TODO: Replace with actual API call when backend supports it
       // For now, use mock data
-      setAnnProfiles([
+      setVectorProfiles([
         {
-          name: 'quick-search',
-          description: 'Fast search with moderate accuracy',
+          name: 'quick-test',
+          description: 'Fast validation with small query count',
           ef_search: 50,
           batch_size: 1,
-          num_queries: 10000,
-          num_runs: 3,
+          num_queries: 1000,
+          num_runs: 1,
           parallelism: 1,
+          timeout_seconds: 300,
+          upload_parallel: 4,
           is_builtin: true,
         },
         {
-          name: 'high-recall',
-          description: 'High accuracy search with larger ef_search',
-          ef_search: 200,
+          name: 'balanced',
+          description: 'Balanced profile for typical benchmarks',
+          ef_search: 100,
           batch_size: 1,
           num_queries: 10000,
           num_runs: 3,
           parallelism: 1,
+          timeout_seconds: 600,
+          upload_parallel: 8,
           is_builtin: true,
         },
         {
-          name: 'batch-search',
-          description: 'Batch queries for throughput testing',
+          name: 'high-throughput',
+          description: 'Parallel execution for throughput testing',
           ef_search: 100,
           batch_size: 100,
           num_queries: 100000,
           num_runs: 5,
-          parallelism: 4,
+          parallelism: 8,
+          timeout_seconds: 1800,
+          upload_parallel: 16,
           is_builtin: true,
         },
       ]);
     } catch (error) {
-      console.error('Failed to load ANN run profiles', error);
+      console.error('Failed to load vector run profiles', error);
     } finally {
-      setAnnLoading(false);
+      setVectorLoading(false);
     }
   };
 
@@ -258,55 +266,57 @@ export default function RunProfiles() {
     }
   };
 
-  // ANN Benchmarks handlers
-  const handleCreateAnn = () => {
-    setEditingAnnProfile(null);
-    annForm.resetFields();
-    annForm.setFieldsValue({
+  // Vector DB Benchmark handlers
+  const handleCreateVector = () => {
+    setEditingVectorProfile(null);
+    vectorForm.resetFields();
+    vectorForm.setFieldsValue({
       ef_search: 100,
       batch_size: 1,
       num_queries: 10000,
       num_runs: 3,
       parallelism: 1,
+      timeout_seconds: 600,
+      upload_parallel: 8,
     });
-    setAnnModalOpen(true);
+    setVectorModalOpen(true);
   };
 
-  const handleEditAnn = (profile: ANNRunProfile) => {
+  const handleEditVector = (profile: VectorRunProfile) => {
     if (profile.is_builtin) {
       message.warning('Cannot edit built-in profiles. Use duplicate instead.');
       return;
     }
-    setEditingAnnProfile(profile);
-    annForm.setFieldsValue(profile);
-    setAnnModalOpen(true);
+    setEditingVectorProfile(profile);
+    vectorForm.setFieldsValue(profile);
+    setVectorModalOpen(true);
   };
 
-  const handleDuplicateAnn = (profile: ANNRunProfile) => {
-    setEditingAnnProfile(null);
-    annForm.setFieldsValue({
+  const handleDuplicateVector = (profile: VectorRunProfile) => {
+    setEditingVectorProfile(null);
+    vectorForm.setFieldsValue({
       ...profile,
       name: `${profile.name}-copy`,
     });
-    setAnnModalOpen(true);
+    setVectorModalOpen(true);
   };
 
-  const handleDeleteAnn = async (name: string) => {
+  const handleDeleteVector = async (name: string) => {
     try {
       // TODO: Replace with actual API call when backend supports it
-      setAnnProfiles(annProfiles.filter(p => p.name !== name));
-      message.success('ANN run profile deleted');
+      setVectorProfiles(vectorProfiles.filter(p => p.name !== name));
+      message.success('Vector run profile deleted');
     } catch (error: unknown) {
       const err = error as { message?: string };
-      message.error(err.message || 'Failed to delete ANN run profile');
+      message.error(err.message || 'Failed to delete vector run profile');
     }
   };
 
-  const handleSaveAnn = async () => {
+  const handleSaveVector = async () => {
     try {
-      const values = await annForm.validateFields();
+      const values = await vectorForm.validateFields();
       
-      const profile: ANNRunProfile = {
+      const profile: VectorRunProfile = {
         name: values.name,
         description: values.description || '',
         ef_search: values.ef_search,
@@ -314,22 +324,24 @@ export default function RunProfiles() {
         num_queries: values.num_queries,
         num_runs: values.num_runs,
         parallelism: values.parallelism,
+        timeout_seconds: values.timeout_seconds || 600,
+        upload_parallel: values.upload_parallel || 8,
       };
 
-      if (editingAnnProfile) {
+      if (editingVectorProfile) {
         // TODO: Replace with actual API call
-        setAnnProfiles(annProfiles.map(p => p.name === editingAnnProfile.name ? profile : p));
-        message.success('ANN run profile updated');
+        setVectorProfiles(vectorProfiles.map(p => p.name === editingVectorProfile.name ? profile : p));
+        message.success('Vector run profile updated');
       } else {
         // TODO: Replace with actual API call
-        setAnnProfiles([...annProfiles, profile]);
-        message.success('ANN run profile created');
+        setVectorProfiles([...vectorProfiles, profile]);
+        message.success('Vector run profile created');
       }
 
-      setAnnModalOpen(false);
+      setVectorModalOpen(false);
     } catch (error: unknown) {
       const err = error as { message?: string };
-      message.error(err.message || 'Failed to save ANN run profile');
+      message.error(err.message || 'Failed to save vector run profile');
     }
   };
 
@@ -447,13 +459,13 @@ export default function RunProfiles() {
     },
   ];
 
-  // ANN Benchmarks columns
-  const annColumns: ColumnsType<ANNRunProfile> = [
+  // Vector DB Benchmark columns
+  const vectorColumns: ColumnsType<VectorRunProfile> = [
     {
       title: 'Name',
       dataIndex: 'name',
       key: 'name',
-      render: (name: string, record: ANNRunProfile) => (
+      render: (name: string, record: VectorRunProfile) => (
         <Space>
           <RadarChartOutlined style={{ color: record.is_builtin ? '#1890ff' : '#52c41a' }} />
           <Text strong>{name}</Text>
@@ -509,20 +521,20 @@ export default function RunProfiles() {
       title: 'Actions',
       key: 'actions',
       width: 150,
-      render: (_, record: ANNRunProfile) => (
+      render: (_, record: VectorRunProfile) => (
         <Space>
           <Tooltip title="Duplicate">
-            <Button type="text" icon={<CopyOutlined />} onClick={() => handleDuplicateAnn(record)} />
+            <Button type="text" icon={<CopyOutlined />} onClick={() => handleDuplicateVector(record)} />
           </Tooltip>
           {!record.is_builtin && (
             <>
               <Tooltip title="Edit">
-                <Button type="text" icon={<EditOutlined />} onClick={() => handleEditAnn(record)} />
+                <Button type="text" icon={<EditOutlined />} onClick={() => handleEditVector(record)} />
               </Tooltip>
               <Popconfirm
-                title="Delete ANN Run Profile"
+                title="Delete Vector Run Profile"
                 description="Are you sure you want to delete this profile?"
-                onConfirm={() => handleDeleteAnn(record.name)}
+                onConfirm={() => handleDeleteVector(record.name)}
                 okText="Delete"
                 okButtonProps={{ danger: true }}
               >
@@ -574,35 +586,35 @@ export default function RunProfiles() {
     </>
   );
 
-  // ANN Benchmarks Pane Content
-  const AnnPane = () => (
+  // Vector DB Benchmark Pane Content
+  const VectorPane = () => (
     <>
       <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
         <Col>
           <Text type="secondary">
-            Configure query parameters for ann_benchmarks (ef_search, batch size, parallelism)
+            Configure search parameters for redis/vector-db-benchmark (ef_search, parallelism, timeouts)
           </Text>
         </Col>
         <Col>
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreateAnn}>
-            Create ANN Profile
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreateVector}>
+            Create Vector Profile
           </Button>
         </Col>
       </Row>
       <Table
-        columns={annColumns}
-        dataSource={annProfiles}
+        columns={vectorColumns}
+        dataSource={vectorProfiles}
         rowKey="name"
-        loading={annLoading}
+        loading={vectorLoading}
         pagination={false}
         locale={{
           emptyText: (
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="No ANN run profiles found"
+              description="No vector run profiles found"
             >
-              <Button type="primary" icon={<PlusOutlined />} onClick={handleCreateAnn}>
-                Create Your First ANN Profile
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleCreateVector}>
+                Create Your First Vector Profile
               </Button>
             </Empty>
           ),
@@ -641,14 +653,14 @@ export default function RunProfiles() {
               children: <MemtierPane />,
             },
             {
-              key: 'ann',
+              key: 'vector',
               label: (
                 <span>
                   <RadarChartOutlined />
-                  ann_benchmarks
+                  vector-db-benchmark
                 </span>
               ),
-              children: <AnnPane />,
+              children: <VectorPane />,
             },
           ]}
         />
@@ -810,16 +822,16 @@ export default function RunProfiles() {
         </Form>
       </Modal>
 
-      {/* ANN Benchmarks Run Profile Editor Modal */}
+      {/* Vector DB Benchmark Run Profile Editor Modal */}
       <Modal
-        title={editingAnnProfile ? 'Edit ANN Run Profile' : 'Create ANN Run Profile'}
-        open={annModalOpen}
-        onCancel={() => setAnnModalOpen(false)}
-        onOk={handleSaveAnn}
-        width={600}
-        okText={editingAnnProfile ? 'Update' : 'Create'}
+        title={editingVectorProfile ? 'Edit Vector Run Profile' : 'Create Vector Run Profile'}
+        open={vectorModalOpen}
+        onCancel={() => setVectorModalOpen(false)}
+        onOk={handleSaveVector}
+        width={700}
+        okText={editingVectorProfile ? 'Update' : 'Create'}
       >
-        <Form form={annForm} layout="vertical">
+        <Form form={vectorForm} layout="vertical">
           <Row gutter={16}>
             <Col span={24}>
               <Form.Item
@@ -830,7 +842,7 @@ export default function RunProfiles() {
                   { pattern: /^[a-z0-9-]+$/, message: 'Only lowercase letters, numbers, and hyphens' }
                 ]}
               >
-                <Input placeholder="my-ann-profile" disabled={!!editingAnnProfile} />
+                <Input placeholder="my-vector-profile" disabled={!!editingVectorProfile} />
               </Form.Item>
             </Col>
           </Row>
@@ -839,7 +851,7 @@ export default function RunProfiles() {
             <TextArea rows={2} placeholder="Describe what this profile is optimized for..." />
           </Form.Item>
 
-          <Divider>Query Parameters</Divider>
+          <Divider>Search Parameters</Divider>
 
           <Row gutter={16}>
             <Col span={12}>
@@ -899,8 +911,34 @@ export default function RunProfiles() {
             </Col>
           </Row>
 
+          <Divider>Resource Limits</Divider>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item 
+                name="timeout_seconds" 
+                label="Timeout (seconds)" 
+                tooltip="Maximum time for benchmark execution"
+              >
+                <InputNumber min={60} max={86400} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item 
+                name="upload_parallel" 
+                label="Upload Parallelism" 
+                tooltip="Parallel workers for dataset upload"
+              >
+                <InputNumber min={1} max={64} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+          </Row>
+
           <Text type="secondary" style={{ display: 'block', marginTop: 16 }}>
-            💡 Index parameters (M, ef_construction) and dataset are configured in <strong>Workload Profiles</strong>.
+            💡 Index parameters (M, ef_construction), engine, and dataset are configured in <strong>Workload Profiles</strong>.
+          </Text>
+          <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
+            🐳 Runs via: <code>docker run redis/vector-db-benchmark:latest</code>
           </Text>
         </Form>
       </Modal>
