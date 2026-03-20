@@ -231,7 +231,7 @@ type MemtierConfig struct {
 	Cluster  bool   `json:"cluster,omitempty"`
 
 	// Workload
-	Ratio      string `json:"ratio,omitempty"`   // e.g., "1:1"
+	Ratio      string `json:"ratio,omitempty"` // e.g., "1:1"
 	KeyPattern string `json:"key_pattern,omitempty"`
 	KeyMinimum int64  `json:"key_minimum,omitempty"`
 	KeyMaximum int64  `json:"key_maximum,omitempty"`
@@ -283,15 +283,15 @@ func CreateMemtierTask(name string, config *MemtierConfig, options ...TaskOption
 	steps := StandardMemtierSteps()
 
 	task := &Task{
-		ID:          generateID(),
-		Name:        name,
-		Tool:        ToolMemtier,
-		ToolConfig:  configJSON,
-		Status:      StatusPending,
-		Steps:       make([]Step, 0, len(steps)),
-		CreatedAt:   time.Now().UTC(),
+		ID:            generateID(),
+		Name:          name,
+		Tool:          ToolMemtier,
+		ToolConfig:    configJSON,
+		Status:        StatusPending,
+		Steps:         make([]Step, 0, len(steps)),
+		CreatedAt:     time.Now().UTC(),
 		LastUpdatedAt: time.Now().UTC(),
-		MaxRetries:  3,
+		MaxRetries:    3,
 	}
 
 	// Initialize steps

@@ -39,10 +39,10 @@ type StepType string
 
 const (
 	// Infrastructure deployment steps (cloud/managed)
-	StepDeployInfra      StepType = "deploy_infra"       // Deploy cloud infrastructure (Azure AMR, VMs, etc.)
-	StepWaitInfraReady   StepType = "wait_infra_ready"   // Wait for infrastructure to be fully ready
-	StepValidateInfra    StepType = "validate_infra"     // Check infrastructure is reachable
-	StepPrepareRunner    StepType = "prepare_runner"     // Install dependencies on runner (memtier, Docker, etc.)
+	StepDeployInfra    StepType = "deploy_infra"     // Deploy cloud infrastructure (Azure AMR, VMs, etc.)
+	StepWaitInfraReady StepType = "wait_infra_ready" // Wait for infrastructure to be fully ready
+	StepValidateInfra  StepType = "validate_infra"   // Check infrastructure is reachable
+	StepPrepareRunner  StepType = "prepare_runner"   // Install dependencies on runner (memtier, Docker, etc.)
 
 	// Database steps
 	StepPrepareDatabase StepType = "prepare_database" // Clear/configure database
@@ -58,8 +58,8 @@ const (
 	StepCollectLogs    StepType = "collect_logs"    // Gather logs from runner
 
 	// Cleanup steps
-	StepCleanup        StepType = "cleanup"         // Optional cleanup (data, indexes)
-	StepDestroyInfra   StepType = "destroy_infra"   // Destroy cloud infrastructure (optional)
+	StepCleanup      StepType = "cleanup"       // Optional cleanup (data, indexes)
+	StepDestroyInfra StepType = "destroy_infra" // Destroy cloud infrastructure (optional)
 )
 
 // ToolType identifies the benchmark tool being used.
@@ -89,10 +89,10 @@ type Task struct {
 	TargetURL      string `json:"target_url,omitempty"`
 
 	// Infrastructure deployment (for cloud runs)
-	DeployInfra   bool   `json:"deploy_infra,omitempty"`    // Whether to deploy infrastructure
-	DestroyInfra  bool   `json:"destroy_infra,omitempty"`   // Whether to destroy after completion
-	DeploymentID  string `json:"deployment_id,omitempty"`   // Cloud deployment ID (for tracking/resume)
-	CloudProvider string `json:"cloud_provider,omitempty"`  // e.g., "azure", "aws"
+	DeployInfra   bool   `json:"deploy_infra,omitempty"`   // Whether to deploy infrastructure
+	DestroyInfra  bool   `json:"destroy_infra,omitempty"`  // Whether to destroy after completion
+	DeploymentID  string `json:"deployment_id,omitempty"`  // Cloud deployment ID (for tracking/resume)
+	CloudProvider string `json:"cloud_provider,omitempty"` // e.g., "azure", "aws"
 
 	// Status tracking
 	Status      TaskStatus `json:"status"`
@@ -263,19 +263,19 @@ func (t *Task) CalculateProgress() int {
 	// Weight each step - some steps are heavier than others
 	// Infrastructure deployment can take 10-30+ minutes
 	weights := map[StepType]int{
-		StepDeployInfra:      20, // Can take 10-30+ minutes for Azure AMR
-		StepWaitInfraReady:   10, // Waiting for provisioning
-		StepValidateInfra:    3,
-		StepPrepareRunner:    5,
-		StepPrepareDatabase:  5,
-		StepUploadDataset:    15, // Large vector datasets
-		StepBuildIndex:       15, // Can take hours for large indexes
-		StepWarmup:           5,
-		StepRunBenchmark:     15,
-		StepCollectResults:   3,
-		StepCollectLogs:      2,
-		StepCleanup:          1,
-		StepDestroyInfra:     1,
+		StepDeployInfra:     20, // Can take 10-30+ minutes for Azure AMR
+		StepWaitInfraReady:  10, // Waiting for provisioning
+		StepValidateInfra:   3,
+		StepPrepareRunner:   5,
+		StepPrepareDatabase: 5,
+		StepUploadDataset:   15, // Large vector datasets
+		StepBuildIndex:      15, // Can take hours for large indexes
+		StepWarmup:          5,
+		StepRunBenchmark:    15,
+		StepCollectResults:  3,
+		StepCollectLogs:     2,
+		StepCleanup:         1,
+		StepDestroyInfra:    1,
 	}
 
 	for _, step := range t.Steps {

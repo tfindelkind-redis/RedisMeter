@@ -16,14 +16,14 @@ import (
 type DeployPhase string
 
 const (
-	PhaseNotStarted    DeployPhase = "not_started"
-	PhaseInitializing  DeployPhase = "initializing"
-	PhaseApplying      DeployPhase = "applying"
-	PhaseWaitingReady  DeployPhase = "waiting_ready"
-	PhaseReady         DeployPhase = "ready"
-	PhaseDestroying    DeployPhase = "destroying"
-	PhaseDestroyed     DeployPhase = "destroyed"
-	PhaseFailed        DeployPhase = "failed"
+	PhaseNotStarted   DeployPhase = "not_started"
+	PhaseInitializing DeployPhase = "initializing"
+	PhaseApplying     DeployPhase = "applying"
+	PhaseWaitingReady DeployPhase = "waiting_ready"
+	PhaseReady        DeployPhase = "ready"
+	PhaseDestroying   DeployPhase = "destroying"
+	PhaseDestroyed    DeployPhase = "destroyed"
+	PhaseFailed       DeployPhase = "failed"
 )
 
 // DeploymentCheckpoint stores the state needed to resume a deployment.
@@ -176,10 +176,10 @@ func (h *TerraformDeployHandler) startNewDeployment(ctx context.Context, task *T
 
 	if state.Outputs != nil {
 		checkpoint.Outputs = map[string]interface{}{
-			"redis_hostname":    state.Outputs.RedisHostname,
-			"redis_port":        state.Outputs.RedisPort,
-			"resource_group":    state.Outputs.ResourceGroupName,
-			"runner_ips":        state.Outputs.RunnerIPs,
+			"redis_hostname":     state.Outputs.RedisHostname,
+			"redis_port":         state.Outputs.RedisPort,
+			"resource_group":     state.Outputs.ResourceGroupName,
+			"runner_ips":         state.Outputs.RunnerIPs,
 			"runner_private_ips": state.Outputs.RunnerPrivateIPs,
 		}
 	}
