@@ -66,13 +66,13 @@ type BenchmarkEngine interface {
 
 // ActiveBenchmark tracks a running benchmark.
 type ActiveBenchmark struct {
-	ID        string           `json:"id"`
-	Status    string           `json:"status"`
-	Progress  float64          `json:"progress"`
-	StartTime time.Time        `json:"start_time"`
-	StageKey  string           `json:"stage_key,omitempty"`
-	Config    *BenchmarkConfig `json:"config"`
-	Cancel    context.CancelFunc
+	ID                      string           `json:"id"`
+	Status                  string           `json:"status"`
+	Progress                float64          `json:"progress"`
+	StartTime               time.Time        `json:"start_time"`
+	StageKey                string           `json:"stage_key,omitempty"`
+	Config                  *BenchmarkConfig `json:"config"`
+	Cancel                  context.CancelFunc
 	ExpectedDurationSeconds int64 `json:"expected_duration_seconds,omitempty"`
 }
 
@@ -1263,18 +1263,18 @@ func (s *Server) handleBenchmarkStatus(w http.ResponseWriter, r *http.Request) {
 		}
 		estimatedRemainingSeconds := estimateBenchmarkRemainingSeconds(ab, stage)
 		writeJSON(w, http.StatusOK, map[string]interface{}{
-			"id":         ab.ID,
-			"status":     ab.Status,
-			"progress":   ab.Progress,
-			"start_time": ab.StartTime,
-			"stage_key":  stage.Key,
-			"stage_label": stage.Label,
-			"stage_index": stage.Index,
-			"total_stages": stage.Total,
-			"elapsed_seconds": elapsedSeconds,
-			"expected_duration_seconds": ab.ExpectedDurationSeconds,
+			"id":                          ab.ID,
+			"status":                      ab.Status,
+			"progress":                    ab.Progress,
+			"start_time":                  ab.StartTime,
+			"stage_key":                   stage.Key,
+			"stage_label":                 stage.Label,
+			"stage_index":                 stage.Index,
+			"total_stages":                stage.Total,
+			"elapsed_seconds":             elapsedSeconds,
+			"expected_duration_seconds":   ab.ExpectedDurationSeconds,
 			"estimated_remaining_seconds": estimatedRemainingSeconds,
-			"config":     ab.Config,
+			"config":                      ab.Config,
 		})
 
 	case http.MethodDelete:
@@ -1431,13 +1431,13 @@ func compareRuns(run1, run2 *domain.BenchmarkRun) map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"run1_id": run1.ID,
-		"run2_id": run2.ID,
-		"comparable":          comparable,
-		"comparison_quality":  quality,
+		"run1_id":              run1.ID,
+		"run2_id":              run2.ID,
+		"comparable":           comparable,
+		"comparison_quality":   quality,
 		"blocking_differences": blockers,
-		"warnings":            warnings,
-		"verdict":             verdict,
+		"warnings":             warnings,
+		"verdict":              verdict,
 		"compatibility": map[string]interface{}{
 			"workload":          workloadDetails,
 			"execution_profile": profileDetails,
@@ -2403,11 +2403,11 @@ func (s *Server) handleCloudBenchmark(w http.ResponseWriter, r *http.Request) {
 
 	// Store active benchmark
 	s.activeBenchmarks.Store(benchmarkID, &ActiveBenchmark{
-		ID:        benchmarkID,
-		Status:    "running",
-		StartTime: time.Now(),
-		StageKey:  "starting",
-		Cancel:    cancel,
+		ID:                      benchmarkID,
+		Status:                  "running",
+		StartTime:               time.Now(),
+		StageKey:                "starting",
+		Cancel:                  cancel,
 		ExpectedDurationSeconds: int64(computeExpectedBenchmarkDuration(req.Duration).Seconds()),
 	})
 
@@ -2425,15 +2425,15 @@ func (s *Server) handleCloudBenchmark(w http.ResponseWriter, r *http.Request) {
 
 // CloudBenchmarkRequest represents a request to run a benchmark on cloud infrastructure.
 type CloudBenchmarkRequest struct {
-	InfrastructureID string `json:"infrastructure_id"`
-	Name             string `json:"name,omitempty"`
-	Description      string `json:"description,omitempty"`
-	Workload         string `json:"workload"`
-	Clients          int    `json:"clients,omitempty"`
-	Threads          int    `json:"threads,omitempty"`
-	Duration         string `json:"duration,omitempty"`
-	Requests         int    `json:"requests,omitempty"`
-	Pipeline         int    `json:"pipeline,omitempty"`
+	InfrastructureID string   `json:"infrastructure_id"`
+	Name             string   `json:"name,omitempty"`
+	Description      string   `json:"description,omitempty"`
+	Workload         string   `json:"workload"`
+	Clients          int      `json:"clients,omitempty"`
+	Threads          int      `json:"threads,omitempty"`
+	Duration         string   `json:"duration,omitempty"`
+	Requests         int      `json:"requests,omitempty"`
+	Pipeline         int      `json:"pipeline,omitempty"`
 	Tags             []string `json:"tags,omitempty"`
 }
 
@@ -2616,20 +2616,20 @@ func (s *Server) runCloudBenchmark(ctx context.Context, benchmarkID string, stat
 
 	// Save to storage
 	run := &domain.BenchmarkRun{
-		ID:        benchmarkID,
-		CreatedAt: startTime,
-		UpdatedAt: endTime,
-		Name:      strings.TrimSpace(req.Name),
+		ID:          benchmarkID,
+		CreatedAt:   startTime,
+		UpdatedAt:   endTime,
+		Name:        strings.TrimSpace(req.Name),
 		Description: strings.TrimSpace(req.Description),
-		Workload:  wl,
-		Target:    target,
+		Workload:    wl,
+		Target:      target,
 		Environment: environment,
-		StartTime: startTime,
-		EndTime:   endTime,
-		Duration:  endTime.Sub(startTime).String(),
-		Status:    domain.RunStatusCompleted,
-		Results:   aggregatedResults,
-		Tags:      append([]string{"cloud", state.Provider, state.Region}, req.Tags...),
+		StartTime:   startTime,
+		EndTime:     endTime,
+		Duration:    endTime.Sub(startTime).String(),
+		Status:      domain.RunStatusCompleted,
+		Results:     aggregatedResults,
+		Tags:        append([]string{"cloud", state.Provider, state.Region}, req.Tags...),
 		Labels: map[string]string{
 			"cloud":          "true",
 			"provider":       state.Provider,

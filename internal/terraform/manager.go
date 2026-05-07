@@ -791,15 +791,15 @@ tags = {
 
 		// Normalize eviction policy: Redis Enterprise requires PascalCase values.
 		evictionPolicyMap := map[string]string{
-			"allkeys-lru":    "AllKeysLRU",
-			"allkeys-lfu":    "AllKeysLFU",
-			"allkeys-random": "AllKeysRandom",
-			"volatile-lru":   "VolatileLRU",
-			"volatile-lfu":   "VolatileLFU",
+			"allkeys-lru":     "AllKeysLRU",
+			"allkeys-lfu":     "AllKeysLFU",
+			"allkeys-random":  "AllKeysRandom",
+			"volatile-lru":    "VolatileLRU",
+			"volatile-lfu":    "VolatileLFU",
 			"volatile-random": "VolatileRandom",
-			"volatile-ttl":   "VolatileTTL",
-			"noeviction":     "NoEviction",
-			"no-eviction":    "NoEviction",
+			"volatile-ttl":    "VolatileTTL",
+			"noeviction":      "NoEviction",
+			"no-eviction":     "NoEviction",
 		}
 		evictionPolicy := defaultString(config.AMR.EvictionPolicy, "AllKeysLRU")
 		if normalized, ok := evictionPolicyMap[evictionPolicy]; ok {
