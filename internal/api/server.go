@@ -136,6 +136,8 @@ func (s *Server) setupRoutes(cfg ServerConfig) {
 	s.mux.HandleFunc("/api/v1/runs", s.handleRuns)
 	s.mux.HandleFunc("/api/v1/runs/", s.handleRun)
 	s.mux.HandleFunc("/api/v1/baselines", s.handleBaselines)
+	s.mux.HandleFunc("/api/v1/baselines/export", s.handleBaselineExport)
+	s.mux.HandleFunc("/api/v1/baselines/import", s.handleBaselineImport)
 	s.mux.HandleFunc("/api/v1/baselines/", s.handleBaseline)
 	s.mux.HandleFunc("/api/v1/workloads", s.handleWorkloads)
 	s.mux.HandleFunc("/api/v1/workloads/", s.handleWorkload)
@@ -510,12 +512,23 @@ func (s *Server) createBaseline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if strings.TrimSpace(baseline.RunID) == "" {
+		writeError(w, http.StatusBadRequest, "run_id is required")
+		return
+	}
+
 	now := time.Now().UTC()
 	if baseline.CreatedAt.IsZero() {
 		baseline.CreatedAt = now
 	}
 	if baseline.UpdatedAt.IsZero() {
 		baseline.UpdatedAt = now
+	}
+	if strings.TrimSpace(baseline.ID) == "" {
+		baseline.ID = fmt.Sprintf("base-%d", now.UnixNano())
+	}
+	if strings.TrimSpace(baseline.Name) == "" {
+		baseline.Name = baseline.ID
 	}
 
 	s.enrichBaselineFromRun(ctx, &baseline)
@@ -642,6 +655,187 @@ func (s *Server) deleteBaseline(w http.ResponseWriter, r *http.Request, id strin
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted", "id": id})
+}
+
+type baselineExchangeBundle struct {
+	Version    string                 `json:"version"`
+	ExportedAt time.Time              `json:"exported_at"`
+	Baselines  []*domain.Baseline     `json:"baselines"`
+	Runs       []*domain.BenchmarkRun `json:"runs"`
+	Warnings   []string               `json:"warnings,omitempty"`
+}
+
+func (s *Server) handleBaselineExport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w)
+		return
+	}
+
+	ctx := r.Context()
+	idsParam := strings.TrimSpace(r.URL.Query().Get("ids"))
+	selected := map[string]struct{}{}
+	if idsParam != "" {
+		for _, id := range strings.Split(idsParam, ",") {
+			id = strings.TrimSpace(id)
+			if id != "" {
+				selected[id] = struct{}{}
+			}
+		}
+	}
+
+	var allBaselines []*domain.Baseline
+	if err := s.storage.Query(ctx, "baseline", plugin.QueryFilter{}, &allBaselines); err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to list baselines: "+err.Error())
+		return
+	}
+
+	exportedBaselines := make([]*domain.Baseline, 0, len(allBaselines))
+	for _, b := range allBaselines {
+		if len(selected) > 0 {
+			if _, ok := selected[b.ID]; !ok {
+				continue
+			}
+		}
+		exportedBaselines = append(exportedBaselines, b)
+	}
+
+	bundle := baselineExchangeBundle{
+		Version:    "1.0",
+		ExportedAt: time.Now().UTC(),
+		Baselines:  exportedBaselines,
+		Runs:       []*domain.BenchmarkRun{},
+	}
+
+	seenRuns := map[string]struct{}{}
+	for _, b := range exportedBaselines {
+		runID := strings.TrimSpace(b.RunID)
+		if runID == "" {
+			continue
+		}
+		if _, ok := seenRuns[runID]; ok {
+			continue
+		}
+		seenRuns[runID] = struct{}{}
+
+		var run domain.BenchmarkRun
+		if err := s.storage.Load(ctx, "runs", runID, &run); err != nil {
+			bundle.Warnings = append(bundle.Warnings, "Referenced run not found for baseline "+b.ID+": "+runID)
+			continue
+		}
+		bundle.Runs = append(bundle.Runs, &run)
+	}
+
+	data, err := json.MarshalIndent(bundle, "", "  ")
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to encode baseline export: "+err.Error())
+		return
+	}
+
+	filename := "redismeter-baselines-" + time.Now().Format("2006-01-02-150405") + ".json"
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+filename+"\"")
+	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+	_, _ = w.Write(data)
+}
+
+func (s *Server) handleBaselineImport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w)
+		return
+	}
+
+	ctx := r.Context()
+	overwrite := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("overwrite")), "true")
+
+	contentType := r.Header.Get("Content-Type")
+	var data []byte
+	var err error
+	if strings.HasPrefix(contentType, "multipart/form-data") {
+		if err := r.ParseMultipartForm(100 << 20); err != nil {
+			writeError(w, http.StatusBadRequest, "Failed to parse multipart form: "+err.Error())
+			return
+		}
+		file, _, err := r.FormFile("file")
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "Missing import file")
+			return
+		}
+		defer file.Close()
+		data, err = io.ReadAll(file)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "Failed to read import file: "+err.Error())
+			return
+		}
+	} else {
+		data, err = io.ReadAll(r.Body)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "Failed to read request body: "+err.Error())
+			return
+		}
+	}
+
+	var bundle baselineExchangeBundle
+	if err := json.Unmarshal(data, &bundle); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid baseline import payload: "+err.Error())
+		return
+	}
+
+	runsImported := 0
+	runsSkipped := 0
+	baselinesImported := 0
+	baselinesSkipped := 0
+	warnings := []string{}
+
+	for _, run := range bundle.Runs {
+		if run == nil || strings.TrimSpace(run.ID) == "" {
+			warnings = append(warnings, "Skipped run with missing ID")
+			runsSkipped++
+			continue
+		}
+		if overwrite {
+			_ = s.storage.Delete(ctx, "runs", run.ID)
+		}
+		if _, err := s.storage.Save(ctx, "runs", run); err != nil {
+			warnings = append(warnings, "Failed to import run "+run.ID+": "+err.Error())
+			runsSkipped++
+			continue
+		}
+		runsImported++
+	}
+
+	for _, b := range bundle.Baselines {
+		if b == nil || strings.TrimSpace(b.RunID) == "" {
+			warnings = append(warnings, "Skipped baseline with missing run_id")
+			baselinesSkipped++
+			continue
+		}
+		if strings.TrimSpace(b.ID) == "" {
+			b.ID = fmt.Sprintf("base-%d", time.Now().UnixNano())
+		}
+		if strings.TrimSpace(b.Name) == "" {
+			b.Name = b.ID
+		}
+		if overwrite {
+			_ = s.storage.Delete(ctx, "baseline", b.ID)
+		}
+		if _, err := s.storage.Save(ctx, "baseline", b); err != nil {
+			warnings = append(warnings, "Failed to import baseline "+b.ID+": "+err.Error())
+			baselinesSkipped++
+			continue
+		}
+		baselinesImported++
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"result": map[string]interface{}{
+			"runs_imported":      runsImported,
+			"runs_skipped":       runsSkipped,
+			"baselines_imported": baselinesImported,
+			"baselines_skipped":  baselinesSkipped,
+			"warnings":           warnings,
+		},
+	})
 }
 
 func (s *Server) handleWorkloads(w http.ResponseWriter, r *http.Request) {

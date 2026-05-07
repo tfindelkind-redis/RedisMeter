@@ -84,6 +84,35 @@ class ApiClient {
     await this.client.post(`/baselines/${id}/activate`);
   }
 
+  async exportBaselines(baselineIds?: string[]): Promise<Blob> {
+    const params = baselineIds && baselineIds.length > 0
+      ? { ids: baselineIds.join(',') }
+      : undefined;
+    const response = await this.client.get('/baselines/export', {
+      params,
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
+  async importBaselines(file: File, overwrite: boolean = false): Promise<{
+    success: boolean;
+    result: {
+      runs_imported: number;
+      runs_skipped: number;
+      baselines_imported: number;
+      baselines_skipped: number;
+      warnings: string[];
+    };
+  }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await this.client.post(`/baselines/import?overwrite=${overwrite}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  }
+
   // Workloads
   async getWorkloads(): Promise<Workload[]> {
     const response = await this.client.get('/workloads');

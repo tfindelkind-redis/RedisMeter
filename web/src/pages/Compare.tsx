@@ -43,6 +43,8 @@ export default function Compare() {
   const [loading, setLoading] = useState(true);
   const [comparing, setComparing] = useState(false);
 
+  const completedRunIDs = new Set(runs.map((r) => r.id));
+
   useEffect(() => {
     loadData();
   }, []);
@@ -77,6 +79,10 @@ export default function Compare() {
     const selectedBaselineForCompare = baselines.find(b => b.id === selectedBaselineId);
     if (!selectedBaselineForCompare?.run_id) {
       message.error('Selected baseline is missing an associated run');
+      return;
+    }
+    if (!completedRunIDs.has(selectedBaselineForCompare.run_id)) {
+      message.error('Selected baseline references a run that no longer exists. Please pick another baseline.');
       return;
     }
     
@@ -147,6 +153,7 @@ export default function Compare() {
 
   const selectedRun = runs.find(r => r.id === selectedRunId);
   const selectedBaseline = baselines.find(b => b.id === selectedBaselineId);
+  const selectedBaselineRunMissing = !!selectedBaseline?.run_id && !completedRunIDs.has(selectedBaseline.run_id);
 
   return (
     <div>
@@ -194,9 +201,15 @@ export default function Compare() {
               optionFilterProp="label"
               options={baselines.map(b => ({
                 value: b.id,
-                label: `${b.run_id || b.id}${b.name ? ` (${b.name})` : ''}${b.active ? ' (Active)' : ''}`,
+                label: `${b.run_id || b.id}${b.name ? ` (${b.name})` : ''}${b.active ? ' (Active)' : ''}${!completedRunIDs.has(b.run_id) ? ' (Missing Run)' : ''}`,
+                disabled: !completedRunIDs.has(b.run_id),
               }))}
             />
+            {selectedBaselineRunMissing && (
+              <Text type="danger" style={{ display: 'block', marginTop: 8 }}>
+                This baseline references a deleted run and cannot be compared.
+              </Text>
+            )}
           </Col>
         </Row>
         <Row style={{ marginTop: 16 }} justify="center">
@@ -204,7 +217,7 @@ export default function Compare() {
             type="primary" 
             onClick={runComparison}
             loading={comparing}
-            disabled={!selectedRunId || !selectedBaselineId}
+            disabled={!selectedRunId || !selectedBaselineId || selectedBaselineRunMissing}
             size="large"
           >
             Compare

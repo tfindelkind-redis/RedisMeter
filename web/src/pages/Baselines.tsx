@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Card,
   Table,
@@ -13,6 +13,7 @@ import {
   Spin,
   Tooltip,
   Popconfirm,
+  Checkbox,
 } from 'antd';
 import {
   CheckCircleOutlined,
@@ -32,6 +33,9 @@ export default function Baselines() {
   const navigate = useNavigate();
   const [baselines, setBaselines] = useState<Baseline[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedBaselineIds, setSelectedBaselineIds] = useState<string[]>([]);
+  const [overwriteOnImport, setOverwriteOnImport] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     loadBaselines();
@@ -67,6 +71,43 @@ export default function Baselines() {
     } catch (error) {
       message.error('Failed to update baseline');
     }
+  };
+
+  const exportBaselines = async () => {
+    try {
+      const selected = selectedBaselineIds.map(String);
+      const blob = await api.exportBaselines(selected.length > 0 ? selected : undefined);
+      const scope = selected.length > 0 ? `${selected.length}-selected` : 'all';
+      const filename = `redismeter-baselines-${scope}-${dayjs().format('YYYYMMDD-HHmmss')}.json`;
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      message.success('Baseline export created');
+    } catch (error) {
+      message.error('Failed to export baselines');
+    }
+  };
+
+  const importBaselines = async (file: File) => {
+    try {
+      const result = await api.importBaselines(file, overwriteOnImport);
+      const importedRuns = result?.result?.runs_imported || 0;
+      const importedBaselines = result?.result?.baselines_imported || 0;
+      const skipped = (result?.result?.runs_skipped || 0) + (result?.result?.baselines_skipped || 0);
+      message.success(`Imported ${importedBaselines} baselines and ${importedRuns} runs${skipped > 0 ? ` (${skipped} skipped)` : ''}`);
+      loadBaselines();
+    } catch (error) {
+      message.error('Failed to import baselines');
+    }
+  };
+
+  const onPickImportFile = () => {
+    fileInputRef.current?.click();
   };
 
   const columns = [
@@ -198,6 +239,30 @@ export default function Baselines() {
             Save benchmark results as baselines for comparison
           </Text>
         </Col>
+        <Col>
+          <Space>
+            <Checkbox checked={overwriteOnImport} onChange={(e) => setOverwriteOnImport(e.target.checked)}>
+              Overwrite on import
+            </Checkbox>
+            <Button onClick={onPickImportFile}>Import</Button>
+            <Button type="primary" onClick={exportBaselines}>
+              Export {selectedBaselineIds.length > 0 ? `(${selectedBaselineIds.length})` : 'All'}
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json,.json"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  importBaselines(file);
+                }
+                e.currentTarget.value = '';
+              }}
+            />
+          </Space>
+        </Col>
       </Row>
 
       <Card style={{ background: '#1f1f1f', border: '1px solid #303030' }}>
@@ -219,6 +284,10 @@ export default function Baselines() {
             dataSource={baselines}
             columns={columns}
             rowKey="id"
+            rowSelection={{
+              selectedRowKeys: selectedBaselineIds,
+              onChange: (keys) => setSelectedBaselineIds(keys.map(String)),
+            }}
             pagination={{
               pageSize: 10,
               showSizeChanger: true,
