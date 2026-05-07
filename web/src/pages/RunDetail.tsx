@@ -399,6 +399,15 @@ export default function RunDetail() {
                     <Descriptions.Item label="Region">
                       {run.labels?.region || run.environment?.cloud?.region || '-'}
                     </Descriptions.Item>
+                    <Descriptions.Item label="Runner Count">
+                      {run.environment?.cloud?.runner_count || run.labels?.runner_count || '-'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Runner Public IPs">
+                      {run.environment?.cloud?.runner_public_ips?.join(', ') || run.labels?.runner_public_ips || run.environment?.host?.public_ip || '-'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Runner Private IPs">
+                      {run.environment?.cloud?.runner_private_ips?.join(', ') || run.environment?.host?.private_ips?.join(', ') || run.labels?.runner_private_ips || '-'}
+                    </Descriptions.Item>
                     <Descriptions.Item label="AMR SKU">
                       {amrInfo.sku || '-'}
                     </Descriptions.Item>
@@ -427,6 +436,16 @@ export default function RunDetail() {
 
                   <Divider style={{ margin: '8px 0' }} />
                   <Descriptions column={1} size="small">
+                    {run.environment?.host?.primary_ip && (
+                      <Descriptions.Item label="Runner Primary IP">
+                        {run.environment.host.primary_ip}
+                      </Descriptions.Item>
+                    )}
+                    {run.environment?.host?.default_gateway && (
+                      <Descriptions.Item label="Runner Default Gateway">
+                        {run.environment.host.default_gateway}
+                      </Descriptions.Item>
+                    )}
                     {run.environment?.network_latency_ms !== undefined && run.environment.network_latency_ms > 0 && (
                       <Descriptions.Item label="Network Latency">
                         {run.environment.network_latency_ms.toFixed(2)} ms

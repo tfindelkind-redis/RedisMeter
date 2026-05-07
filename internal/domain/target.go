@@ -62,13 +62,17 @@ type Environment struct {
 
 // HostInfo captures host/client system information.
 type HostInfo struct {
-	Hostname      string  `json:"hostname,omitempty"`
-	OS            string  `json:"os,omitempty"`
-	Arch          string  `json:"arch,omitempty"`
-	KernelVersion string  `json:"kernel_version,omitempty"`
-	CPUModel      string  `json:"cpu_model,omitempty"`
-	CPUs          int     `json:"cpus,omitempty"`
-	MemoryGB      float64 `json:"memory_gb,omitempty"`
+	Hostname      string   `json:"hostname,omitempty"`
+	OS            string   `json:"os,omitempty"`
+	Arch          string   `json:"arch,omitempty"`
+	KernelVersion string   `json:"kernel_version,omitempty"`
+	CPUModel      string   `json:"cpu_model,omitempty"`
+	CPUs          int      `json:"cpus,omitempty"`
+	MemoryGB      float64  `json:"memory_gb,omitempty"`
+	PublicIP      string   `json:"public_ip,omitempty"`
+	PrimaryIP     string   `json:"primary_ip,omitempty"`
+	PrivateIPs    []string `json:"private_ips,omitempty"`
+	DefaultGW     string   `json:"default_gateway,omitempty"`
 }
 
 // RedisInfo captures comprehensive Redis server information.
@@ -128,11 +132,15 @@ type RedisInfo struct {
 
 // CloudEnvironment captures cloud-specific details.
 type CloudEnvironment struct {
-	Provider     string `json:"provider,omitempty"` // aws, gcp, azure
-	Region       string `json:"region,omitempty"`
-	Zone         string `json:"zone,omitempty"`
-	InstanceType string `json:"instance_type,omitempty"`
-	InstanceID   string `json:"instance_id,omitempty"`
+	Provider         string            `json:"provider,omitempty"` // aws, gcp, azure
+	Region           string            `json:"region,omitempty"`
+	Zone             string            `json:"zone,omitempty"`
+	InstanceType     string            `json:"instance_type,omitempty"`
+	InstanceID       string            `json:"instance_id,omitempty"`
+	RunnerCount      int               `json:"runner_count,omitempty"`
+	RunnerIPs        []string          `json:"runner_public_ips,omitempty"`
+	RunnerPrivateIPs []string          `json:"runner_private_ips,omitempty"`
+	Metadata         map[string]string `json:"metadata,omitempty"`
 }
 
 // ContainerEnvironment captures container-specific details.

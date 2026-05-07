@@ -658,11 +658,13 @@ func (s *Server) deleteBaseline(w http.ResponseWriter, r *http.Request, id strin
 }
 
 type baselineExchangeBundle struct {
-	Version    string                 `json:"version"`
-	ExportedAt time.Time              `json:"exported_at"`
-	Baselines  []*domain.Baseline     `json:"baselines"`
-	Runs       []*domain.BenchmarkRun `json:"runs"`
-	Warnings   []string               `json:"warnings,omitempty"`
+	Version       string                 `json:"version"`
+	SchemaVersion string                 `json:"schema_version,omitempty"`
+	ExportedAt    time.Time              `json:"exported_at"`
+	Baselines     []*domain.Baseline     `json:"baselines"`
+	Runs          []*domain.BenchmarkRun `json:"runs"`
+	FeatureFlags  []string               `json:"feature_flags,omitempty"`
+	Warnings      []string               `json:"warnings,omitempty"`
 }
 
 func (s *Server) handleBaselineExport(w http.ResponseWriter, r *http.Request) {
@@ -700,10 +702,12 @@ func (s *Server) handleBaselineExport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	bundle := baselineExchangeBundle{
-		Version:    "1.0",
-		ExportedAt: time.Now().UTC(),
-		Baselines:  exportedBaselines,
-		Runs:       []*domain.BenchmarkRun{},
+		Version:       "1.1",
+		SchemaVersion: "1.1",
+		ExportedAt:    time.Now().UTC(),
+		Baselines:     exportedBaselines,
+		Runs:          []*domain.BenchmarkRun{},
+		FeatureFlags:  []string{"baselines_with_runs", "forward_compatible"},
 	}
 
 	seenRuns := map[string]struct{}{}
@@ -774,8 +778,8 @@ func (s *Server) handleBaselineImport(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var bundle baselineExchangeBundle
-	if err := json.Unmarshal(data, &bundle); err != nil {
+	bundle, err := decodeBaselineExchangeBundle(data)
+	if err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid baseline import payload: "+err.Error())
 		return
 	}
@@ -827,7 +831,8 @@ func (s *Server) handleBaselineImport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"success": true,
+		"success":        true,
+		"schema_version": bundle.SchemaVersion,
 		"result": map[string]interface{}{
 			"runs_imported":      runsImported,
 			"runs_skipped":       runsSkipped,
@@ -836,6 +841,97 @@ func (s *Server) handleBaselineImport(w http.ResponseWriter, r *http.Request) {
 			"warnings":           warnings,
 		},
 	})
+}
+
+func decodeBaselineExchangeBundle(data []byte) (baselineExchangeBundle, error) {
+	bundle := baselineExchangeBundle{}
+	if err := json.Unmarshal(data, &bundle); err == nil {
+		if len(bundle.Baselines) > 0 || len(bundle.Runs) > 0 {
+			if strings.TrimSpace(bundle.SchemaVersion) == "" {
+				bundle.SchemaVersion = "1.0"
+			}
+			if strings.TrimSpace(bundle.Version) == "" {
+				bundle.Version = bundle.SchemaVersion
+			}
+			return bundle, nil
+		}
+	}
+
+	raw := map[string]json.RawMessage{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return baselineExchangeBundle{}, err
+	}
+
+	legacy := baselineExchangeBundle{
+		Version:       "1.0",
+		SchemaVersion: "1.0",
+		Baselines:     []*domain.Baseline{},
+		Runs:          []*domain.BenchmarkRun{},
+	}
+
+	if msg, ok := raw["version"]; ok && len(msg) > 0 {
+		_ = json.Unmarshal(msg, &legacy.Version)
+	}
+	if msg, ok := raw["schema_version"]; ok && len(msg) > 0 {
+		_ = json.Unmarshal(msg, &legacy.SchemaVersion)
+	}
+
+	if baselines, err := decodeBaselines(raw); err == nil {
+		legacy.Baselines = baselines
+	}
+	if runs, err := decodeRuns(raw); err == nil {
+		legacy.Runs = runs
+	}
+
+	if len(legacy.Baselines) == 0 && len(legacy.Runs) == 0 {
+		return baselineExchangeBundle{}, fmt.Errorf("payload does not contain baselines or runs")
+	}
+
+	return legacy, nil
+}
+
+func decodeBaselines(raw map[string]json.RawMessage) ([]*domain.Baseline, error) {
+	keys := []string{"baselines", "baseline_data", "baseline"}
+	for _, key := range keys {
+		msg, ok := raw[key]
+		if !ok || len(msg) == 0 {
+			continue
+		}
+
+		var list []*domain.Baseline
+		if err := json.Unmarshal(msg, &list); err == nil {
+			return list, nil
+		}
+
+		var one domain.Baseline
+		if err := json.Unmarshal(msg, &one); err == nil {
+			return []*domain.Baseline{&one}, nil
+		}
+	}
+
+	return []*domain.Baseline{}, nil
+}
+
+func decodeRuns(raw map[string]json.RawMessage) ([]*domain.BenchmarkRun, error) {
+	keys := []string{"runs", "run_data", "benchmark_runs"}
+	for _, key := range keys {
+		msg, ok := raw[key]
+		if !ok || len(msg) == 0 {
+			continue
+		}
+
+		var list []*domain.BenchmarkRun
+		if err := json.Unmarshal(msg, &list); err == nil {
+			return list, nil
+		}
+
+		var one domain.BenchmarkRun
+		if err := json.Unmarshal(msg, &one); err == nil {
+			return []*domain.BenchmarkRun{&one}, nil
+		}
+	}
+
+	return []*domain.BenchmarkRun{}, nil
 }
 
 func (s *Server) handleWorkloads(w http.ResponseWriter, r *http.Request) {
@@ -2832,6 +2928,12 @@ func (s *Server) runCloudBenchmark(ctx context.Context, benchmarkID string, stat
 			"runner_count":   fmt.Sprintf("%d", len(runnerIPs)),
 		},
 	}
+	if len(runnerIPs) > 0 {
+		run.Labels["runner_public_ips"] = strings.Join(runnerIPs, ",")
+	}
+	if state != nil && state.Outputs != nil && len(state.Outputs.RunnerPrivateIPs) > 0 {
+		run.Labels["runner_private_ips"] = strings.Join(state.Outputs.RunnerPrivateIPs, ",")
+	}
 
 	if state.Config.AMR != nil {
 		run.Labels["amr_sku"] = state.Config.AMR.SKU
@@ -2965,7 +3067,7 @@ func captureCloudRunEnvironment(ctx context.Context, state *terraform.InfraState
 	env := &domain.Environment{
 		Host:  &domain.HostInfo{},
 		Redis: &domain.RedisInfo{Config: map[string]string{}},
-		Cloud: &domain.CloudEnvironment{},
+		Cloud: &domain.CloudEnvironment{Metadata: map[string]string{}},
 	}
 
 	if state != nil {
@@ -2973,6 +3075,10 @@ func captureCloudRunEnvironment(ctx context.Context, state *terraform.InfraState
 		env.Cloud.Region = state.Region
 		if state.Config.Runners != nil {
 			env.Cloud.InstanceType = state.Config.Runners.InstanceType
+		}
+		env.Cloud.Metadata["infrastructure_id"] = state.ID
+		if state.Outputs != nil {
+			env.Cloud.RunnerPrivateIPs = append([]string{}, state.Outputs.RunnerPrivateIPs...)
 		}
 
 		if state.Config.AMR != nil {
@@ -2996,8 +3102,14 @@ func captureCloudRunEnvironment(ctx context.Context, state *terraform.InfraState
 	}
 
 	if len(runnerIPs) > 0 {
+		env.Cloud.RunnerCount = len(runnerIPs)
+		env.Cloud.RunnerIPs = append([]string{}, runnerIPs...)
 		env.Host.Hostname = runnerIPs[0]
+		env.Host.PublicIP = runnerIPs[0]
 		if hostInfo := collectRunnerHostInfo(ctx, runnerIPs[0], sshUser); hostInfo != nil {
+			if hostInfo.PublicIP == "" {
+				hostInfo.PublicIP = runnerIPs[0]
+			}
 			env.Host = hostInfo
 		}
 	}
@@ -3018,13 +3130,13 @@ func collectRunnerHostInfo(ctx context.Context, runnerIP string, sshUser string)
 	runnerCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
-	cmd := `bash -lc 'echo HOSTNAME=$(hostname); echo OS=$(uname -s); echo ARCH=$(uname -m); echo KERNEL=$(uname -r); echo CPUS=$(nproc); echo MEM_KB=$(awk "\/MemTotal\/ {print $2}" /proc/meminfo); echo CPU_MODEL=$(awk -F":" "\/model name\/ {gsub(/^ +/, \"\", $2); print $2; exit}" /proc/cpuinfo)'`
+	cmd := `bash -lc 'HOSTNAME=$(hostname); OS=$(uname -s); ARCH=$(uname -m); KERNEL=$(uname -r); CPUS=$(nproc); MEM_KB=$(grep MemTotal /proc/meminfo | awk "{print \$2}"); CPU_MODEL=$(grep -m1 "model name" /proc/cpuinfo | cut -d: -f2- | xargs); PRIMARY_IP=$(hostname -I | awk "{print \$1}"); PRIVATE_IPS=$(hostname -I | tr " " "," | sed "s/,$//"); DEFAULT_GW=$(ip route 2>/dev/null | awk "/default/ {print \$3; exit}"); echo HOSTNAME=$HOSTNAME; echo OS=$OS; echo ARCH=$ARCH; echo KERNEL=$KERNEL; echo CPUS=$CPUS; echo MEM_KB=$MEM_KB; echo CPU_MODEL=$CPU_MODEL; echo PRIMARY_IP=$PRIMARY_IP; echo PRIVATE_IPS=$PRIVATE_IPS; echo DEFAULT_GW=$DEFAULT_GW'`
 	out, err := runSSHCommand(runnerCtx, runnerIP, sshUser, cmd)
 	if err != nil {
-		return &domain.HostInfo{Hostname: runnerIP}
+		return &domain.HostInfo{Hostname: runnerIP, PublicIP: runnerIP}
 	}
 
-	host := &domain.HostInfo{Hostname: runnerIP}
+	host := &domain.HostInfo{Hostname: runnerIP, PublicIP: runnerIP}
 	for _, line := range strings.Split(out, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -3059,6 +3171,14 @@ func collectRunnerHostInfo(ctx context.Context, runnerIP string, sshUser string)
 			}
 		case "CPU_MODEL":
 			host.CPUModel = v
+		case "PRIMARY_IP":
+			host.PrimaryIP = v
+		case "PRIVATE_IPS":
+			if v != "" {
+				host.PrivateIPs = strings.Split(v, ",")
+			}
+		case "DEFAULT_GW":
+			host.DefaultGW = v
 		}
 	}
 

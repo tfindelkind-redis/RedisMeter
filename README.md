@@ -182,7 +182,15 @@ duration: "60s"
 |--------|----------|-------------|
 | GET | `/api/v1/baselines` | List baselines |
 | POST | `/api/v1/baselines` | Create baseline from run |
+| GET | `/api/v1/baselines/export` | Export selected/all baselines with referenced runs |
+| POST | `/api/v1/baselines/import` | Import baseline bundles (supports legacy payload shapes) |
 | DELETE | `/api/v1/baselines/:id` | Delete baseline |
+
+Baseline import/export compatibility policy:
+
+- Imports are backward compatible: older baseline exports are accepted by newer RedisMeter versions.
+- Unknown JSON fields are ignored during import to allow forward evolution of the schema.
+- New exports include `schema_version` and `feature_flags` metadata so newer capabilities can evolve safely.
 
 ### Benchmark
 

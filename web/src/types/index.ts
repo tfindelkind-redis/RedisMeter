@@ -87,6 +87,10 @@ export interface CloudEnvironment {
   zone?: string;
   instance_type?: string;
   instance_id?: string;
+  runner_count?: number;
+  runner_public_ips?: string[];
+  runner_private_ips?: string[];
+  metadata?: Record<string, string>;
 }
 
 export interface HostInfo {
@@ -97,6 +101,10 @@ export interface HostInfo {
   cpu_model?: string;
   cpus?: number;
   memory_gb?: number;
+  public_ip?: string;
+  primary_ip?: string;
+  private_ips?: string[];
+  default_gateway?: string;
 }
 
 export interface RedisInfo {
