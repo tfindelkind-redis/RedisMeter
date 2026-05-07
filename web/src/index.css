@@ -284,3 +284,137 @@ h1, h2, h3, h4, h5, h6,
   background: var(--bg-elevated);
   border-color: var(--border-color);
 }
+
+/* Documentation markdown styles */
+.docs-markdown {
+  color: rgba(255, 255, 255, 0.84);
+  line-height: 1.65;
+}
+
+.docs-markdown h1,
+.docs-markdown h2,
+.docs-markdown h3,
+.docs-markdown h4 {
+  color: rgba(255, 255, 255, 0.94);
+  margin-top: 1.25em;
+  margin-bottom: 0.5em;
+}
+
+.docs-markdown p,
+.docs-markdown li {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.docs-markdown a {
+  color: #69b1ff;
+}
+.docs-markdown {
+  color: rgba(255, 255, 255, 0.84);
+  line-height: 1.65;
+}
+
+.docs-markdown h1,
+.docs-markdown h2,
+.docs-markdown h3,
+.docs-markdown h4,
+.docs-markdown h5,
+.docs-markdown h6 {
+  color: rgba(255, 255, 255, 0.94);
+  margin-top: 1.25em;
+  margin-bottom: 0.5em;
+}
+
+.docs-markdown p,
+.docs-markdown li,
+.docs-markdown strong,
+.docs-markdown b,
+.docs-markdown em,
+.docs-markdown i {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.docs-markdown strong,
+.docs-markdown b {
+  font-weight: 600;
+}
+
+.docs-markdown ul,
+.docs-markdown ol {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.docs-markdown a {
+  color: #69b1ff;
+  text-decoration: none;
+}
+
+.docs-markdown a:hover {
+  text-decoration: underline;
+}
+
+.docs-markdown blockquote {
+  margin: 10px 0;
+  padding: 8px 12px;
+  border-left: 3px solid rgba(220, 56, 45, 0.5);
+  background: rgba(220, 56, 45, 0.05);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.docs-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+}
+
+.docs-markdown tr {
+  border-bottom: 1px solid #303030;
+}
+
+.docs-markdown tbody tr:hover {
+  background: rgba(220, 56, 45, 0.08);
+}
+
+.docs-markdown th,
+.docs-markdown td {
+  border: 1px solid #303030;
+  padding: 8px 12px;
+  text-align: left;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.docs-markdown th {
+  background: rgba(220, 56, 45, 0.1);
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 600;
+}
+
+.docs-markdown code {
+  background: #111;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 1px 6px;
+  color: #f5f5f5;
+  font-family: 'Courier New', monospace;
+}
+
+.docs-markdown pre {
+  background: #0e0e0e;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 12px;
+  overflow-x: auto;
+  margin: 12px 0;
+}
+
+.docs-markdown pre code {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: #f5f5f5;
+}
+
+.docs-markdown hr {
+  border: none;
+  border-top: 1px solid #303030;
+  margin: 16px 0;
+}

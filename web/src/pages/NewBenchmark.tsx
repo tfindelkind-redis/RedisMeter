@@ -30,6 +30,7 @@ import {
   SettingOutlined,
   CheckCircleOutlined,
   LoadingOutlined,
+  ClockCircleOutlined,
   CloudOutlined,
   DownOutlined,
   RightOutlined,
@@ -40,6 +41,7 @@ import {
   PlusOutlined,
   GlobalOutlined,
   SafetyCertificateOutlined,
+  QuestionCircleOutlined,
 } from '@ant-design/icons';
 import api from '@/api/client';
 import { 
@@ -47,6 +49,7 @@ import {
   Infrastructure, 
   BenchmarkToolType, 
   BenchmarkTool,
+  BenchmarkStatus,
 } from '@/types';
 import useWebSocket from '@/hooks/useWebSocket';
 
@@ -88,39 +91,6 @@ const BENCHMARK_TOOLS: BenchmarkTool[] = [
     available: true,
     documentation_url: 'https://github.com/redis/vector-db-benchmark',
   },
-  {
-    id: 'ann_benchmarks',
-    name: 'ANN Benchmarks',
-    description: 'Industry-standard vector search benchmarking. Measures recall vs QPS tradeoffs for HNSW and other ANN algorithms.',
-    icon: 'radar',
-    category: 'vector',
-    supported_workloads: ['vector-search', 'hnsw', 'similarity'],
-    requires_module: ['search'],
-    available: false, // Coming soon
-    documentation_url: 'https://github.com/erikbern/ann-benchmarks',
-  },
-  {
-    id: 'ftsb',
-    name: 'FTSB (Full-Text Search)',
-    description: 'Full-text search benchmarking for RediSearch. Tests FT.SEARCH, FT.AGGREGATE, and FT.ADD performance.',
-    icon: 'search',
-    category: 'search',
-    supported_workloads: ['search', 'full-text', 'aggregation'],
-    requires_module: ['search'],
-    available: false, // Coming soon
-    documentation_url: 'https://github.com/RediSearch/ftsb',
-  },
-  {
-    id: 'vectordb_bench',
-    name: 'VectorDB Bench',
-    description: 'Comprehensive vector database benchmarking with production-like scenarios. Supports insertion, search, and filtered search.',
-    icon: 'experiment',
-    category: 'vector',
-    supported_workloads: ['vector-search', 'vector-insert', 'filtered-search'],
-    requires_module: ['search'],
-    available: false, // Coming soon
-    documentation_url: 'https://github.com/zilliztech/VectorDBBench',
-  },
 ];
 
 // Get icon component for tool category
@@ -158,28 +128,6 @@ interface FormValues {
   duration?: string;
   requests?: number;
   tags?: string;
-  // ANN Benchmarks config
-  ann_dataset?: string;
-  ann_k?: number;
-  ann_ef_construction?: number;
-  ann_ef_search?: number;
-  ann_m?: number;
-  // FTSB config
-  ftsb_use_case?: string;
-  ftsb_doc_count?: number;
-  ftsb_query_count?: number;
-  ftsb_workers?: number;
-  ftsb_pipeline?: number;
-  ftsb_cluster_mode?: boolean;
-  // VectorDB Bench config
-  vdb_case_type?: string;
-  vdb_k?: number;
-  vdb_concurrency?: string;
-  vdb_m?: number;
-  vdb_ef_construction?: number;
-  vdb_ef_search?: number;
-  vdb_drop_old?: boolean;
-  vdb_load?: boolean;
   // Vector DB Benchmark (redis/vector-db-benchmark) config
   vbm_dataset?: string;
   vbm_engine?: string;
@@ -200,6 +148,7 @@ export default function NewBenchmark() {
   const [running, setRunning] = useState(false);
   const [runId, setRunId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
+  const [benchmarkStatus, setBenchmarkStatus] = useState<BenchmarkStatus | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [showOverrides, setShowOverrides] = useState(false);
   
@@ -296,35 +245,7 @@ export default function NewBenchmark() {
       // Build tool-specific configuration
       let toolConfig: Record<string, unknown> = {};
       
-      if (selectedTool === 'ann_benchmarks') {
-        toolConfig = {
-          dataset: values.ann_dataset,
-          k: values.ann_k,
-          ef_construction: values.ann_ef_construction,
-          ef_search: values.ann_ef_search,
-          m: values.ann_m,
-        };
-      } else if (selectedTool === 'ftsb') {
-        toolConfig = {
-          use_case: values.ftsb_use_case,
-          doc_count: values.ftsb_doc_count,
-          query_count: values.ftsb_query_count,
-          workers: values.ftsb_workers,
-          pipeline: values.ftsb_pipeline,
-          cluster_mode: values.ftsb_cluster_mode,
-        };
-      } else if (selectedTool === 'vectordb_bench') {
-        toolConfig = {
-          case_type: values.vdb_case_type,
-          k: values.vdb_k,
-          concurrency: values.vdb_concurrency?.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n)),
-          m: values.vdb_m,
-          ef_construction: values.vdb_ef_construction,
-          ef_search: values.vdb_ef_search,
-          drop_old: values.vdb_drop_old,
-          load: values.vdb_load,
-        };
-      } else if (selectedTool === 'vector_db_benchmark') {
+      if (selectedTool === 'vector_db_benchmark') {
         toolConfig = {
           dataset: values.vbm_dataset,
           engine: values.vbm_engine,
@@ -336,6 +257,10 @@ export default function NewBenchmark() {
         };
       }
 
+      const profile = runProfiles.find((p) => p.name === values.run_profile);
+      const effectiveDuration = values.duration || profile?.duration;
+      const effectiveRequests = values.requests ?? profile?.requests;
+
       // Infrastructure-based benchmark
       const result = await api.runCloudBenchmark({
         infrastructure_id: selectedInfra.id,
@@ -346,12 +271,15 @@ export default function NewBenchmark() {
         run_profile: values.run_profile,
         threads: values.threads,
         clients: values.clients,
-        requests: values.requests || 100000,
+        duration: effectiveDuration,
+        requests: effectiveDuration ? undefined : (effectiveRequests || 100000),
         tool_config: selectedTool !== 'memtier_benchmark' ? toolConfig : undefined,
         tags: values.tags?.split(',').map(t => t.trim()).filter(Boolean),
       });
       
       setRunId(result.benchmark_id || result.id);
+      setBenchmarkStatus(null);
+      setProgress(0);
       setRunning(true);
       message.success(`Benchmark started on ${selectedInfra.name}!`);
       
@@ -370,6 +298,7 @@ export default function NewBenchmark() {
       try {
         const status = await api.getBenchmarkStatus(benchmarkId);
         setProgress(status.progress || 0);
+        setBenchmarkStatus(status);
         
         if (status.status === 'completed') {
           setCurrentStep(2);
@@ -398,6 +327,31 @@ export default function NewBenchmark() {
     
     poll();
   };
+
+  const formatSeconds = (seconds?: number) => {
+    if (!seconds || seconds <= 0) {
+      return '0s';
+    }
+
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    if (mins === 0) {
+      return `${secs}s`;
+    }
+
+    return `${mins}m ${secs}s`;
+  };
+
+  const detailedStages = [
+    { key: 'starting', title: 'Preparing' },
+    { key: 'connecting', title: 'Connecting' },
+    { key: 'executing', title: 'Executing' },
+    { key: 'collecting_results', title: 'Collecting Results' },
+    { key: 'saving', title: 'Saving Run' },
+    { key: 'completed', title: 'Complete' },
+  ];
+
+  const currentDetailedStage = Math.max(0, (benchmarkStatus?.stage_index ?? 1) - 1);
 
   const selectedWorkload = workloads.find(w => w.name === selectedWorkloadName);
   const selectedRunProfile = runProfiles.find(p => p.name === selectedRunProfileName);
@@ -627,12 +581,6 @@ export default function NewBenchmark() {
             message={`${BENCHMARK_TOOLS.find(t => t.id === selectedTool)?.name} Configuration`}
             description={
               <Text type="secondary" style={{ fontSize: 13 }}>
-                {selectedTool === 'ann_benchmarks' && 
-                  'ANN Benchmarks requires pre-configured datasets. Configure algorithm parameters and dataset selection below.'}
-                {selectedTool === 'ftsb' && 
-                  'FTSB will generate test data and queries based on the selected use case. Ensure RediSearch module is loaded.'}
-                {selectedTool === 'vectordb_bench' && 
-                  'VectorDB Bench provides comprehensive vector search testing with various dataset sizes and configurations.'}
                 {selectedTool === 'vector_db_benchmark' && 
                   'Vector DB Benchmark runs via Docker using redis/vector-db-benchmark. Select dataset and engine configuration below.'}
               </Text>
@@ -664,16 +612,35 @@ export default function NewBenchmark() {
         />
         
         {running && (
-          <div style={{ marginTop: 24, textAlign: 'center' }}>
-            <Progress
-              type="circle"
-              percent={progress}
-              strokeColor="#DC382D"
-              format={(pct) => `${pct}%`}
-            />
-            <Paragraph style={{ marginTop: 16 }}>
-              <Text type="secondary">Benchmark in progress...</Text>
-            </Paragraph>
+          <div style={{ marginTop: 24 }}>
+            <div style={{ textAlign: 'center' }}>
+              <Progress
+                type="circle"
+                percent={progress}
+                strokeColor="#DC382D"
+                format={(pct) => `${pct}%`}
+              />
+              <Paragraph style={{ marginTop: 16, marginBottom: 8 }}>
+                <Text strong>{benchmarkStatus?.stage_label || 'Benchmark in progress...'}</Text>
+              </Paragraph>
+              <Space size="large" wrap>
+                <Text type="secondary">
+                  <ClockCircleOutlined style={{ marginRight: 6 }} />
+                  Elapsed: {formatSeconds(benchmarkStatus?.elapsed_seconds)}
+                </Text>
+                <Text type="secondary">
+                  ETA: {formatSeconds(benchmarkStatus?.estimated_remaining_seconds)}
+                </Text>
+              </Space>
+            </div>
+
+            <div style={{ marginTop: 24 }}>
+              <Steps
+                size="small"
+                current={currentDetailedStage}
+                items={detailedStages.map((stage) => ({ title: stage.title }))}
+              />
+            </div>
           </div>
         )}
       </Card>
@@ -724,7 +691,15 @@ export default function NewBenchmark() {
             {selectedTool === 'memtier_benchmark' && (
             <Col xs={24} lg={12}>
               <Card 
-                title="Workload" 
+                title={
+                  <Space>
+                    Workload
+                    <Tooltip title="A Workload defines WHAT operations to run against Redis: which commands (GET, SET, etc.), their mix ratio, key patterns, and data sizes.">
+                      <QuestionCircleOutlined style={{ color: '#8c8c8c', fontSize: 14 }} />
+                    </Tooltip>
+                  </Space>
+                }
+                extra={<Link to="/workloads"><SettingOutlined /> Manage</Link>}
                 style={{ marginBottom: 24 }}
               >
                 <Form.Item
@@ -742,15 +717,24 @@ export default function NewBenchmark() {
                 </Form.Item>
 
                 {selectedWorkload && (
-                  <div style={{ marginTop: 16 }}>
+                  <div style={{ marginTop: 16, padding: 12, background: 'rgba(0, 0, 0, 0.06)', borderRadius: 6 }}>
                     <Text type="secondary">Operations:</Text>
                     <div style={{ marginTop: 8 }}>
-                      {selectedWorkload.operations?.map((op) => (
-                        <Tag key={op.command} style={{ marginBottom: 4 }}>
-                          {op.command} ({(op.ratio * 100).toFixed(0)}%)
-                        </Tag>
-                      ))}
+                      {selectedWorkload.operations && selectedWorkload.operations.length > 0 ? (
+                        selectedWorkload.operations.map((op) => (
+                          <Tag key={op.command} style={{ marginBottom: 4 }}>
+                            {op.command} ({(op.ratio * 100).toFixed(0)}%)
+                          </Tag>
+                        ))
+                      ) : (
+                        <Text type="secondary" italic>Custom workload configuration</Text>
+                      )}
                     </div>
+                    {selectedWorkload.description && (
+                      <div style={{ marginTop: 8, borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: 8 }}>
+                        <Text type="secondary" style={{ fontSize: 12 }}>{selectedWorkload.description}</Text>
+                      </div>
+                    )}
                   </div>
                 )}
               </Card>
@@ -761,7 +745,14 @@ export default function NewBenchmark() {
             {selectedTool === 'memtier_benchmark' && (
             <Col xs={24} lg={12}>
               <Card 
-                title="Run Profile" 
+                title={
+                  <Space>
+                    Run Profile
+                    <Tooltip title="A Run Profile defines HOW to execute the benchmark: number of threads, clients per thread, test duration or request count, and pipeline depth.">
+                      <QuestionCircleOutlined style={{ color: '#8c8c8c', fontSize: 14 }} />
+                    </Tooltip>
+                  </Space>
+                }
                 extra={<Link to="/run-profiles"><SettingOutlined /> Manage</Link>}
                 style={{ marginBottom: 24 }}
               >
@@ -781,25 +772,25 @@ export default function NewBenchmark() {
                 </Form.Item>
 
                 {selectedRunProfile && (
-                  <div style={{ marginTop: 8, padding: 12, background: '#f5f5f5', borderRadius: 6 }}>
+                  <div style={{ marginTop: 8, padding: 12, background: 'rgba(0, 0, 0, 0.06)', borderRadius: 6 }}>
                     <Row gutter={16}>
                       <Col span={12}>
-                        <Text type="secondary">Threads:</Text> <Text strong>{selectedRunProfile.threads}</Text>
+                        <Text type="secondary">Threads:</Text> <Text>{selectedRunProfile.threads}</Text>
                       </Col>
                       <Col span={12}>
-                        <Text type="secondary">Clients:</Text> <Text strong>{selectedRunProfile.clients}</Text>
+                        <Text type="secondary">Clients:</Text> <Text>{selectedRunProfile.clients}</Text>
                       </Col>
                     </Row>
                     <Row gutter={16} style={{ marginTop: 8 }}>
                       <Col span={12}>
                         {selectedRunProfile.duration ? (
-                          <><Text type="secondary">Duration:</Text> <Text strong>{selectedRunProfile.duration}</Text></>
+                          <><Text type="secondary">Duration:</Text> <Text>{selectedRunProfile.duration}</Text></>
                         ) : (
-                          <><Text type="secondary">Requests:</Text> <Text strong>{selectedRunProfile.requests?.toLocaleString()}</Text></>
+                          <><Text type="secondary">Requests:</Text> <Text>{selectedRunProfile.requests?.toLocaleString()}</Text></>
                         )}
                       </Col>
                       <Col span={12}>
-                        <Text type="secondary">Pipeline:</Text> <Text strong>{selectedRunProfile.pipeline}</Text>
+                        <Text type="secondary">Pipeline:</Text> <Text>{selectedRunProfile.pipeline}</Text>
                       </Col>
                     </Row>
                     {selectedRunProfile.description && (
@@ -855,74 +846,6 @@ export default function NewBenchmark() {
                 </div>
               </Card>
             </Col>
-            )}
-
-            {/* ANN Benchmarks Configuration */}
-            {selectedTool === 'ann_benchmarks' && (
-              <Col xs={24}>
-                <Card 
-                  title={<><RadarChartOutlined /> ANN Benchmarks Configuration</>}
-                  style={{ marginBottom: 24 }}
-                >
-                  <Row gutter={24}>
-                    <Col xs={24} lg={12}>
-                      <Form.Item
-                        name="ann_dataset"
-                        label="Dataset"
-                        rules={[{ required: selectedTool === 'ann_benchmarks', message: 'Please select a dataset' }]}
-                        extra="Pre-configured datasets with ground truth for recall measurement"
-                      >
-                        <Select placeholder="Select dataset">
-                          <Option value="glove-100-angular">GloVe-100 (Angular, 1.2M vectors)</Option>
-                          <Option value="sift-128-euclidean">SIFT-128 (Euclidean, 1M vectors)</Option>
-                          <Option value="gist-960-euclidean">GIST-960 (Euclidean, 1M vectors)</Option>
-                          <Option value="fashion-mnist-784-euclidean">Fashion-MNIST (Euclidean, 60K vectors)</Option>
-                          <Option value="nytimes-256-angular">NYTimes-256 (Angular, 290K vectors)</Option>
-                          <Option value="deep1b-96-angular">DEEP1B-96 (Angular, 10M vectors)</Option>
-                        </Select>
-                      </Form.Item>
-
-                      <Form.Item
-                        name="ann_k"
-                        label="K (Nearest Neighbors)"
-                        initialValue={10}
-                        extra="Number of nearest neighbors to retrieve"
-                      >
-                        <InputNumber min={1} max={1000} style={{ width: '100%' }} />
-                      </Form.Item>
-                    </Col>
-
-                    <Col xs={24} lg={12}>
-                      <Form.Item
-                        name="ann_ef_construction"
-                        label="ef_construction"
-                        initialValue={200}
-                        extra="HNSW index build parameter (higher = better recall, slower build)"
-                      >
-                        <InputNumber min={50} max={1000} style={{ width: '100%' }} />
-                      </Form.Item>
-
-                      <Form.Item
-                        name="ann_ef_search"
-                        label="ef_search"
-                        initialValue={100}
-                        extra="HNSW search parameter (higher = better recall, slower search)"
-                      >
-                        <InputNumber min={10} max={500} style={{ width: '100%' }} />
-                      </Form.Item>
-
-                      <Form.Item
-                        name="ann_m"
-                        label="M (Max Connections)"
-                        initialValue={16}
-                        extra="HNSW parameter: max number of connections per node"
-                      >
-                        <InputNumber min={4} max={64} style={{ width: '100%' }} />
-                      </Form.Item>
-                    </Col>
-                  </Row>
-                </Card>
-              </Col>
             )}
 
             {/* Vector DB Benchmark Configuration */}
@@ -1014,181 +937,6 @@ export default function NewBenchmark() {
                       >
                         <Switch />
                       </Form.Item>
-                    </Col>
-                  </Row>
-                </Card>
-              </Col>
-            )}
-
-            {/* FTSB Configuration */}
-            {selectedTool === 'ftsb' && (
-              <Col xs={24}>
-                <Card 
-                  title={<><SearchOutlined /> FTSB Configuration</>}
-                  style={{ marginBottom: 24 }}
-                >
-                  <Row gutter={24}>
-                    <Col xs={24} lg={12}>
-                      <Form.Item
-                        name="ftsb_use_case"
-                        label="Use Case"
-                        rules={[{ required: selectedTool === 'ftsb', message: 'Please select a use case' }]}
-                        extra="Pre-defined benchmark scenarios with data generation"
-                      >
-                        <Select placeholder="Select use case">
-                          <Option value="enwiki_abstract">Wikipedia Abstracts (Full-text search)</Option>
-                          <Option value="enwiki_pages">Wikipedia Pages (Large documents)</Option>
-                          <Option value="nyc_taxis">NYC Taxis (Write performance)</Option>
-                          <Option value="ecommerce_inventory">E-commerce Inventory (Aggregations)</Option>
-                        </Select>
-                      </Form.Item>
-
-                      <Form.Item
-                        name="ftsb_doc_count"
-                        label="Document Count"
-                        initialValue={100000}
-                        extra="Number of documents to generate and index"
-                      >
-                        <InputNumber min={1000} max={10000000} style={{ width: '100%' }} />
-                      </Form.Item>
-
-                      <Form.Item
-                        name="ftsb_query_count"
-                        label="Query Count"
-                        initialValue={10000}
-                        extra="Number of search queries to execute"
-                      >
-                        <InputNumber min={100} max={1000000} style={{ width: '100%' }} />
-                      </Form.Item>
-                    </Col>
-
-                    <Col xs={24} lg={12}>
-                      <Form.Item
-                        name="ftsb_workers"
-                        label="Workers"
-                        initialValue={4}
-                        extra="Concurrent workers executing queries"
-                      >
-                        <InputNumber min={1} max={64} style={{ width: '100%' }} />
-                      </Form.Item>
-
-                      <Form.Item
-                        name="ftsb_pipeline"
-                        label="Pipeline"
-                        initialValue={1}
-                        extra="Number of commands to pipeline"
-                      >
-                        <InputNumber min={1} max={100} style={{ width: '100%' }} />
-                      </Form.Item>
-
-                      <Form.Item
-                        name="ftsb_cluster_mode"
-                        label="Cluster Mode"
-                        valuePropName="checked"
-                        extra="Enable for Redis Cluster deployments"
-                      >
-                        <Switch />
-                      </Form.Item>
-                    </Col>
-                  </Row>
-                </Card>
-              </Col>
-            )}
-
-            {/* VectorDB Bench Configuration */}
-            {selectedTool === 'vectordb_bench' && (
-              <Col xs={24}>
-                <Card 
-                  title={<><ExperimentOutlined /> VectorDB Bench Configuration</>}
-                  style={{ marginBottom: 24 }}
-                >
-                  <Row gutter={24}>
-                    <Col xs={24} lg={12}>
-                      <Form.Item
-                        name="vdb_case_type"
-                        label="Test Case"
-                        rules={[{ required: selectedTool === 'vectordb_bench', message: 'Please select a test case' }]}
-                        extra="Performance test configurations with varying dataset sizes"
-                      >
-                        <Select placeholder="Select test case">
-                          <Option value="Performance768D1M">768D × 1M vectors (Medium)</Option>
-                          <Option value="Performance768D10M">768D × 10M vectors (Large)</Option>
-                          <Option value="Performance1536D500K">1536D × 500K vectors (OpenAI-like)</Option>
-                          <Option value="Performance1536D5M">1536D × 5M vectors (Large OpenAI-like)</Option>
-                          <Option value="CapacityDim128">Capacity Test - 128D</Option>
-                          <Option value="CapacityDim960">Capacity Test - 960D</Option>
-                        </Select>
-                      </Form.Item>
-
-                      <Form.Item
-                        name="vdb_k"
-                        label="K (Nearest Neighbors)"
-                        initialValue={100}
-                        extra="Number of nearest neighbors to retrieve"
-                      >
-                        <InputNumber min={1} max={1000} style={{ width: '100%' }} />
-                      </Form.Item>
-
-                      <Form.Item
-                        name="vdb_concurrency"
-                        label="Concurrency Levels"
-                        initialValue="1,10,20"
-                        extra="Comma-separated concurrency values to test"
-                      >
-                        <Input placeholder="1,10,20,50" />
-                      </Form.Item>
-                    </Col>
-
-                    <Col xs={24} lg={12}>
-                      <Form.Item
-                        name="vdb_m"
-                        label="M (HNSW connections)"
-                        initialValue={16}
-                        extra="HNSW index parameter"
-                      >
-                        <InputNumber min={4} max={64} style={{ width: '100%' }} />
-                      </Form.Item>
-
-                      <Form.Item
-                        name="vdb_ef_construction"
-                        label="ef_construction"
-                        initialValue={200}
-                        extra="HNSW index build parameter"
-                      >
-                        <InputNumber min={50} max={1000} style={{ width: '100%' }} />
-                      </Form.Item>
-
-                      <Form.Item
-                        name="vdb_ef_search"
-                        label="ef_search"
-                        initialValue={100}
-                        extra="HNSW search parameter"
-                      >
-                        <InputNumber min={10} max={500} style={{ width: '100%' }} />
-                      </Form.Item>
-
-                      <Row gutter={16}>
-                        <Col span={12}>
-                          <Form.Item
-                            name="vdb_drop_old"
-                            label="Drop Old Data"
-                            valuePropName="checked"
-                            initialValue={true}
-                          >
-                            <Switch />
-                          </Form.Item>
-                        </Col>
-                        <Col span={12}>
-                          <Form.Item
-                            name="vdb_load"
-                            label="Load Data"
-                            valuePropName="checked"
-                            initialValue={true}
-                          >
-                            <Switch />
-                          </Form.Item>
-                        </Col>
-                      </Row>
                     </Col>
                   </Row>
                 </Card>

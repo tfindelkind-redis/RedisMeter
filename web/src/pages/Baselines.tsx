@@ -117,11 +117,20 @@ export default function Baselines() {
       title: 'Environment',
       key: 'environment',
       render: (_: any, record: Baseline) => {
-        const env = record.environment;
-        if (!env) return '-';
+        const provider = record.labels?.provider;
+        const envCategory = record.labels?.environment;
+        const region = record.labels?.region;
+        if (!provider && !envCategory && !region) return '-';
+
+        const primary = provider || envCategory || 'unknown';
+        const color = primary === 'azure' ? 'blue' : primary === 'local' ? 'green' : 'default';
+
         return (
-          <Tooltip title={`${env.host?.hostname} - ${env.redis?.version}`}>
-            <Tag>{env.fingerprint?.slice(0, 8)}</Tag>
+          <Tooltip title={region ? `Region: ${region}` : 'Environment category'}>
+            <Space size={4}>
+              <Tag color={color}>{primary}</Tag>
+              {region && <Tag>{region}</Tag>}
+            </Space>
           </Tooltip>
         );
       },

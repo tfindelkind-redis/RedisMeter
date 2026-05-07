@@ -73,13 +73,20 @@ export default function Compare() {
       message.warning('Please select both a run and a baseline');
       return;
     }
+
+    const selectedBaselineForCompare = baselines.find(b => b.id === selectedBaselineId);
+    if (!selectedBaselineForCompare?.run_id) {
+      message.error('Selected baseline is missing an associated run');
+      return;
+    }
     
     setComparing(true);
     try {
-      const result = await api.compare(selectedRunId, selectedBaselineId);
+      const result = await api.compare(selectedRunId, selectedBaselineForCompare.run_id);
       setComparison(result);
-    } catch (error) {
-      message.error('Failed to compare');
+    } catch (error: any) {
+      const apiError = error?.response?.data?.error || error?.message || 'Unknown error';
+      message.error(`Failed to compare: ${apiError}`);
     } finally {
       setComparing(false);
     }
@@ -108,6 +115,26 @@ export default function Compare() {
       case 'fail':
         return <Tag icon={<CloseCircleFilled />} color="error">Failed</Tag>;
     }
+  };
+
+  const formatDetailValue = (value: unknown): string => {
+    if (value === null || value === undefined) return '-';
+    if (typeof value === 'boolean') return value ? 'true' : 'false';
+    if (typeof value === 'number') return Number.isFinite(value) ? String(value) : '-';
+    if (typeof value === 'string') return value || '-';
+    if (Array.isArray(value)) return value.length ? value.join(', ') : '-';
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  };
+
+  const categoryLabel: Record<string, string> = {
+    workload: 'Workload',
+    execution_profile: 'Execution Profile',
+    target_infra: 'Target / Infrastructure',
+    environment: 'Environment / Hardware',
   };
 
   if (loading) {
@@ -149,7 +176,7 @@ export default function Compare() {
               optionFilterProp="label"
               options={runs.map(r => ({
                 value: r.id,
-                label: `${r.name || r.id.slice(0, 8)} - ${r.workload?.name || 'Unknown'}`,
+                label: `${r.id}${r.name ? ` (${r.name})` : ''} - ${r.workload?.name || 'Unknown'}`,
               }))}
             />
           </Col>
@@ -167,7 +194,7 @@ export default function Compare() {
               optionFilterProp="label"
               options={baselines.map(b => ({
                 value: b.id,
-                label: `${b.name} ${b.active ? '(Active)' : ''}`,
+                label: `${b.run_id || b.id}${b.name ? ` (${b.name})` : ''}${b.active ? ' (Active)' : ''}`,
               }))}
             />
           </Col>
@@ -356,6 +383,77 @@ export default function Compare() {
               ))}
             </Card>
           )}
+
+          <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+            <Col xs={24}>
+              <Card title="Comparison Context" style={{ background: '#1f1f1f', border: '1px solid #303030' }}>
+                <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+                  <Col xs={24} sm={12} md={6}>
+                    <Text type="secondary">Comparable</Text>
+                    <div>
+                      <Tag color={comparison.comparable ? 'green' : 'red'}>
+                        {comparison.comparable ? 'Yes' : 'No'}
+                      </Tag>
+                    </div>
+                  </Col>
+                  <Col xs={24} sm={12} md={6}>
+                    <Text type="secondary">Quality</Text>
+                    <div>
+                      <Tag color={comparison.comparison_quality === 'valid' ? 'green' : comparison.comparison_quality === 'questionable' ? 'orange' : 'red'}>
+                        {comparison.comparison_quality || 'unknown'}
+                      </Tag>
+                    </div>
+                  </Col>
+                  <Col xs={24} sm={12} md={6}>
+                    <Text type="secondary">Blocking Differences</Text>
+                    <div><Text strong>{comparison.blocking_differences?.length || 0}</Text></div>
+                  </Col>
+                  <Col xs={24} sm={12} md={6}>
+                    <Text type="secondary">Warnings</Text>
+                    <div><Text strong>{comparison.warnings?.length || 0}</Text></div>
+                  </Col>
+                </Row>
+
+                {comparison.blocking_differences && comparison.blocking_differences.length > 0 && (
+                  <Card size="small" title="Blocking Differences" style={{ marginBottom: 12, background: '#141414', border: '1px solid #58181c' }}>
+                    {comparison.blocking_differences.map((item, idx) => (
+                      <div key={idx}><Text style={{ color: '#ff7875' }}>- {item}</Text></div>
+                    ))}
+                  </Card>
+                )}
+
+                {comparison.warnings && comparison.warnings.length > 0 && (
+                  <Card size="small" title="Warnings" style={{ marginBottom: 12, background: '#141414', border: '1px solid #614700' }}>
+                    {comparison.warnings.map((item, idx) => (
+                      <div key={idx}><Text style={{ color: '#ffd666' }}>- {item}</Text></div>
+                    ))}
+                  </Card>
+                )}
+
+                {comparison.compatibility && (
+                  <Row gutter={[12, 12]}>
+                    {Object.entries(comparison.compatibility).map(([key, details]) => (
+                      <Col xs={24} lg={12} key={key}>
+                        <Card
+                          size="small"
+                          title={categoryLabel[key] || key}
+                          style={{ background: '#141414', border: '1px solid #303030' }}
+                        >
+                          <Descriptions column={1} size="small">
+                            {Object.entries(details || {}).map(([detailKey, detailValue]) => (
+                              <Descriptions.Item key={detailKey} label={detailKey.replace(/_/g, ' ')}>
+                                <Text>{formatDetailValue(detailValue)}</Text>
+                              </Descriptions.Item>
+                            ))}
+                          </Descriptions>
+                        </Card>
+                      </Col>
+                    ))}
+                  </Row>
+                )}
+              </Card>
+            </Col>
+          </Row>
         </>
       )}
 

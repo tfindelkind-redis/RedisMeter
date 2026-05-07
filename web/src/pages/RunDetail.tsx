@@ -105,6 +105,21 @@ export default function RunDetail() {
     return <Empty description="Run not found" />;
   }
 
+  const createdAt = run.created_at && !run.created_at.startsWith('0001-01-01')
+    ? run.created_at
+    : (run.start_time || '');
+
+  const amrInfo = {
+    sku: run.labels?.amr_sku || run.environment?.redis?.config?.amr_sku,
+    clustering: run.labels?.amr_clustering || run.environment?.redis?.config?.amr_clustering,
+    highAvailability: run.labels?.amr_high_availability || run.environment?.redis?.config?.amr_high_availability,
+    evictionPolicy: run.labels?.amr_eviction_policy || run.environment?.redis?.config?.amr_eviction_policy,
+    modules: run.labels?.amr_modules || run.environment?.redis?.config?.amr_modules,
+    accessKeyAuth: run.labels?.amr_access_keys_authentication || run.environment?.redis?.config?.amr_access_keys_authentication,
+    entraAuth: run.labels?.amr_entra_authentication || run.environment?.redis?.config?.amr_entra_authentication,
+    minTls: run.labels?.amr_minimum_tls_version || run.environment?.redis?.config?.amr_minimum_tls_version,
+  };
+
   const summary = run.results?.summary;
 
   return (
@@ -240,7 +255,7 @@ export default function RunDetail() {
                     <Text code>{run.id}</Text>
                   </Descriptions.Item>
                   <Descriptions.Item label="Created">
-                    {dayjs(run.created_at).format('YYYY-MM-DD HH:mm:ss')}
+                    {createdAt ? dayjs(createdAt).format('YYYY-MM-DD HH:mm:ss') : '-'}
                   </Descriptions.Item>
                   <Descriptions.Item label="Duration">
                     {run.duration || '-'}
@@ -373,6 +388,41 @@ export default function RunDetail() {
                         {run.environment.redis.instantaneous_ops_per_sec.toLocaleString()} ops/sec
                       </Descriptions.Item>
                     )}
+                  </Descriptions>
+
+                  <Divider style={{ margin: '8px 0' }} />
+                  <Text strong>Cloud / AMR</Text>
+                  <Descriptions column={1} size="small">
+                    <Descriptions.Item label="Provider">
+                      {run.labels?.provider || run.environment?.cloud?.provider || '-'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Region">
+                      {run.labels?.region || run.environment?.cloud?.region || '-'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="AMR SKU">
+                      {amrInfo.sku || '-'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Clustering">
+                      {amrInfo.clustering || '-'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="High Availability">
+                      {amrInfo.highAvailability || '-'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Eviction Policy">
+                      {amrInfo.evictionPolicy || '-'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Modules">
+                      {amrInfo.modules || '-'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Auth (Access Keys)">
+                      {amrInfo.accessKeyAuth || '-'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Auth (Entra ID)">
+                      {amrInfo.entraAuth || '-'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Minimum TLS">
+                      {amrInfo.minTls || '-'}
+                    </Descriptions.Item>
                   </Descriptions>
 
                   <Divider style={{ margin: '8px 0' }} />

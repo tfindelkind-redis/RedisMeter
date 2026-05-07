@@ -11,6 +11,7 @@ import {
   ExperimentOutlined,
   SettingOutlined,
   AppstoreOutlined,
+  BookOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '@/store';
@@ -85,6 +86,11 @@ export default function Sidebar() {
       key: '/analytics',
       icon: <LineChartOutlined />,
       label: 'Analytics',
+    },
+    {
+      key: '/docs',
+      icon: <BookOutlined />,
+      label: 'Documentation',
     },
   ];
 

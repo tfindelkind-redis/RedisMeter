@@ -6,6 +6,13 @@
 
 A scalable Redis performance benchmarking and baseline tool built on memtier_benchmark, designed for repeatable load testing, baseline comparison, and performance regression analysis.
 
+## 📚 Documentation
+
+Start here for a beginner-friendly learning path and concept guide:
+
+- **[Documentation Hub](doc/Documentation_Index.md)** - Central index/agenda covering Benchmark, Baseline, job handling, cloud runners, and Azure execution.
+- **[Beginner UI Workflow](doc/Beginner_UI_Workflow.md)** - First-time walkthrough from starting a benchmark to creating baselines and comparing runs.
+
 ## ✨ Features
 
 ### Core Benchmarking

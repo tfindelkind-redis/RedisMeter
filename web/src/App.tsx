@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from 'antd';
 import Sidebar from '@/components/Layout/Sidebar';
 import Header from '@/components/Layout/Header';
@@ -15,6 +15,7 @@ import InfrastructureDetail from '@/pages/InfrastructureDetail';
 import InfraProfiles from '@/pages/InfraProfiles';
 import Workloads from '@/pages/Workloads';
 import RunProfiles from '@/pages/RunProfiles';
+import Docs from '@/pages/Docs';
 import { useGlobalWebSocket } from '@/hooks/useWebSocket';
 import { useEffect } from 'react';
 import { useStore } from '@/store';
@@ -54,6 +55,8 @@ function App() {
             <Route path="/infra-profiles" element={<InfraProfiles />} />
             <Route path="/workloads" element={<Workloads />} />
             <Route path="/run-profiles" element={<RunProfiles />} />
+            <Route path="/docs" element={<Docs />} />
+            <Route path="*" element={<Navigate to="/docs" replace />} />
           </Routes>
         </Content>
       </Layout>

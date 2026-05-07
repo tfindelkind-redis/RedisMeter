@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
-import { BenchmarkRun, Baseline, ComparisonResult, AnalysisResult, Workload, Infrastructure } from '@/types';
+import { BenchmarkRun, Baseline, ComparisonResult, AnalysisResult, Workload, Infrastructure, BenchmarkStatus } from '@/types';
 
 const API_BASE = '/api/v1';
 
@@ -224,11 +224,7 @@ class ApiClient {
     return response.data;
   }
 
-  async getBenchmarkStatus(id: string): Promise<{
-    id: string;
-    status: string;
-    progress: number;
-  }> {
+  async getBenchmarkStatus(id: string): Promise<BenchmarkStatus> {
     const response = await this.client.get(`/benchmark/${id}`);
     return response.data;
   }
@@ -246,7 +242,56 @@ class ApiClient {
       run_id_1: runId,
       run_id_2: baselineOrOtherRunId,
     });
-    return response.data;
+
+    const data = response.data;
+
+    // Backend returns nested metrics in the current schema; map to the UI's legacy fields.
+    if (data?.metrics?.throughput || data?.metrics?.avg_latency) {
+      const throughputPct = Number(data?.metrics?.throughput?.change_pct ?? 0);
+      const avgLatencyPct = Number(data?.metrics?.avg_latency?.change_pct ?? 0);
+      const p99Run1 = Number(data?.metrics?.p99_latency?.run1 ?? 0);
+      const p99Run2 = Number(data?.metrics?.p99_latency?.run2 ?? 0);
+      const p99Pct = p99Run1 > 0 ? ((p99Run2 - p99Run1) / p99Run1) * 100 : 0;
+
+      return {
+        run_id: data.run1_id || runId,
+        baseline_id: baselineOrOtherRunId,
+        pass: data.verdict === 'pass',
+        passed: data.verdict === 'pass',
+        verdict: data.verdict || 'warning',
+        comparable: Boolean(data.comparable),
+        comparison_quality: data.comparison_quality,
+        blocking_differences: data.blocking_differences || [],
+        warnings: data.warnings || [],
+        compatibility: data.compatibility || {},
+        changes: {
+          throughput_pct: throughputPct,
+          avg_latency_pct: avgLatencyPct,
+          p99_latency_pct: p99Pct,
+          error_rate_pct: 0,
+        },
+        metrics: {
+          throughput_change: 0,
+          throughput_change_pct: throughputPct,
+          latency_change: 0,
+          latency_change_pct: avgLatencyPct,
+          p99_change: p99Run2 - p99Run1,
+          p99_change_pct: p99Pct,
+          error_rate_change: 0,
+        },
+        environment_match: Boolean(data.comparable),
+        environment_diffs: data.warnings || [],
+        violations: (data.blocking_differences || []).map((msg: string) => ({
+          metric: 'compatibility',
+          threshold: 'comparable',
+          actual: 'incompatible',
+          status: 'fail' as const,
+          message: msg,
+        })),
+      };
+    }
+
+    return data;
   }
 
   // Analysis
@@ -264,6 +309,31 @@ class ApiClient {
     storage?: { healthy: boolean; message: string };
   }> {
     const response = await this.client.get('/health');
+    return response.data;
+  }
+
+  // Documentation
+  async getDocs(): Promise<Array<{
+    id: string;
+    title: string;
+    path: string;
+    category: string;
+    description: string;
+    available: boolean;
+  }>> {
+    const response = await this.client.get('/docs');
+    return response.data?.docs || [];
+  }
+
+  async getDoc(id: string): Promise<{
+    id: string;
+    title: string;
+    path: string;
+    category: string;
+    description: string;
+    content: string;
+  }> {
+    const response = await this.client.get(`/docs/${id}`);
     return response.data;
   }
 

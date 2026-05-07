@@ -74,10 +74,19 @@ export interface Target {
 export interface Environment {
   host?: HostInfo;
   redis?: RedisInfo;
+  cloud?: CloudEnvironment;
   fingerprint?: string;
   network_latency_ms?: number;
   redismeter_version?: string;
   memtier_version?: string;
+}
+
+export interface CloudEnvironment {
+  provider?: string;
+  region?: string;
+  zone?: string;
+  instance_type?: string;
+  instance_id?: string;
 }
 
 export interface HostInfo {
@@ -230,6 +239,11 @@ export interface ComparisonResult {
   pass?: boolean;
   passed?: boolean;
   verdict: string;
+  comparable?: boolean;
+  comparison_quality?: 'valid' | 'questionable' | 'invalid' | string;
+  blocking_differences?: string[];
+  warnings?: string[];
+  compatibility?: Record<string, Record<string, unknown>>;
   metrics?: MetricsComparison;
   changes?: {
     throughput_pct?: number;
@@ -309,6 +323,20 @@ export interface BenchmarkProgress {
   current_ops: number;
   current_latency: number;
   elapsed: string;
+}
+
+export interface BenchmarkStatus {
+  id: string;
+  status: string;
+  progress: number;
+  start_time?: string;
+  stage_key?: string;
+  stage_label?: string;
+  stage_index?: number;
+  total_stages?: number;
+  elapsed_seconds?: number;
+  expected_duration_seconds?: number;
+  estimated_remaining_seconds?: number;
 }
 
 // Benchmark configuration for starting a new benchmark

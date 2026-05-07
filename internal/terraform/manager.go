@@ -129,8 +129,8 @@ func (m *Manager) Provision(ctx context.Context, config InfraConfig) (*InfraStat
 
 // ProvisionWithProgress creates new infrastructure with progress callbacks.
 func (m *Manager) ProvisionWithProgress(ctx context.Context, config InfraConfig, progress ProgressCallback) (*InfraState, error) {
+	// --- Initial setup under lock ---
 	m.mu.Lock()
-	defer m.mu.Unlock()
 
 	// Generate unique ID
 	id := fmt.Sprintf("rm-%s-%d", config.Provider, time.Now().Unix())
@@ -141,6 +141,7 @@ func (m *Manager) ProvisionWithProgress(ctx context.Context, config InfraConfig,
 	// Create workspace directory
 	workspacePath := filepath.Join(m.baseDir, id)
 	if err := os.MkdirAll(workspacePath, 0755); err != nil {
+		m.mu.Unlock()
 		return nil, fmt.Errorf("failed to create workspace: %w", err)
 	}
 
@@ -166,18 +167,20 @@ func (m *Manager) ProvisionWithProgress(ctx context.Context, config InfraConfig,
 		state.Status = "failed"
 		state.Error = err.Error()
 		m.saveState(state)
+		m.mu.Unlock()
 		return state, fmt.Errorf("failed to generate Terraform files: %w", err)
 	}
 
-	// Save initial state
+	// Save initial state and mark as provisioning before releasing lock
+	state.Status = "provisioning"
+	state.UpdatedAt = time.Now()
 	if err := m.saveState(state); err != nil {
+		m.mu.Unlock()
 		return nil, fmt.Errorf("failed to save state: %w", err)
 	}
 
-	// Run terraform init
-	state.Status = "provisioning"
-	state.UpdatedAt = time.Now()
-	m.saveState(state)
+	m.mu.Unlock()
+	// --- Lock released; long-running Terraform operations below ---
 
 	if progress != nil {
 		progress(TerraformEvent{
@@ -236,17 +239,19 @@ func (m *Manager) Destroy(ctx context.Context, id string) error {
 
 // DestroyWithProgress tears down infrastructure with progress callbacks.
 func (m *Manager) DestroyWithProgress(ctx context.Context, id string, progress ProgressCallback) error {
+	// Load and mark as destroying under lock, then run terraform destroy without holding lock.
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	state, err := m.loadState(id)
 	if err != nil {
+		m.mu.Unlock()
 		return fmt.Errorf("infrastructure not found: %w", err)
 	}
 
 	state.Status = "destroying"
 	state.UpdatedAt = time.Now()
 	m.saveState(state)
+	m.mu.Unlock()
+	// --- Lock released; long-running terraform destroy below ---
 
 	// Run terraform destroy
 	if progress != nil {
@@ -739,7 +744,7 @@ variable "runner_count" {
 variable "runner_instance_type" {
   description = "VM size for runners"
   type        = string
-  default     = "Standard_D4s_v3"
+  default     = "Standard_B2s"
 }
 
 variable "ssh_public_key" {
@@ -777,14 +782,38 @@ tags = {
 
 	if config.AMR != nil {
 		redisName := fmt.Sprintf("rm-%d", time.Now().Unix())
+		// Normalize clustering policy: Azure Redis Enterprise only accepts EnterpriseCluster or OSSCluster.
+		clusteringPolicy := defaultString(config.AMR.ClusteringPolicy, "EnterpriseCluster")
+		switch clusteringPolicy {
+		case "non-clustered", "NoCluster", "none", "":
+			clusteringPolicy = "EnterpriseCluster"
+		}
+
+		// Normalize eviction policy: Redis Enterprise requires PascalCase values.
+		evictionPolicyMap := map[string]string{
+			"allkeys-lru":    "AllKeysLRU",
+			"allkeys-lfu":    "AllKeysLFU",
+			"allkeys-random": "AllKeysRandom",
+			"volatile-lru":   "VolatileLRU",
+			"volatile-lfu":   "VolatileLFU",
+			"volatile-random": "VolatileRandom",
+			"volatile-ttl":   "VolatileTTL",
+			"noeviction":     "NoEviction",
+			"no-eviction":    "NoEviction",
+		}
+		evictionPolicy := defaultString(config.AMR.EvictionPolicy, "AllKeysLRU")
+		if normalized, ok := evictionPolicyMap[evictionPolicy]; ok {
+			evictionPolicy = normalized
+		}
+
 		sb.WriteString(fmt.Sprintf(`redis_name        = "%s"
 redis_sku         = "%s"
 high_availability = %t
 clustering_policy = "%s"
 eviction_policy   = "%s"
 `, redisName, config.AMR.SKU, config.AMR.HighAvailability,
-			defaultString(config.AMR.ClusteringPolicy, "OSSCluster"),
-			defaultString(config.AMR.EvictionPolicy, "VolatileLRU")))
+			clusteringPolicy,
+			evictionPolicy))
 
 		if len(config.AMR.Modules) > 0 {
 			sb.WriteString(`redis_modules = [`)
@@ -809,7 +838,7 @@ ssh_public_key       = <<-EOF
 %s
 EOF
 `, config.Runners.Count,
-			defaultString(config.Runners.InstanceType, "Standard_D4s_v3"),
+			defaultString(config.Runners.InstanceType, "Standard_B2s"),
 			defaultString(config.Runners.SSHUser, "azureuser"),
 			config.Runners.SSHPublicKey))
 	}
